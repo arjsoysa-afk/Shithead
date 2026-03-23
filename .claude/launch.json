@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev-server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "server/src/index.ts"],
+      "port": 3001,
+      "cwd": "/Users/arjunasoysa/shithead"
+    },
+    {
+      "name": "dev-client",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite"],
+      "port": 5173,
+      "cwd": "/Users/arjunasoysa/shithead/client"
+    }
+  ]
+}

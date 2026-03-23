@@ -1,0 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg-primary text-text-primary font-sans antialiased;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    @apply bg-accent/30;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply backdrop-blur-md bg-white/[0.02] border border-border;
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px theme('colors.accent.glow');
+  }
+
+  .glow-burn {
+    box-shadow: 0 0 20px theme('colors.burn.glow');
+  }
+}
