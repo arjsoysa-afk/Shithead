@@ -1,6 +1,6 @@
 import {
-  Card, GameState, Player, ClientGameState, OpponentView,
-  RANK_ORDER, isBlackSuit,
+  Card, Rank, GameState, Player, ClientGameState, OpponentView,
+  RANK_ORDER, isBlackSuit, isRedSuit,
 } from '../../shared/types';
 import { deal } from './deck';
 import { isValidPlay, getEffectivePileTop, getCardSource, canPlayOn } from './validators';
@@ -11,15 +11,19 @@ import { applySpecialEffects } from './specialCards';
 export function createGame(playerInfos: { id: string; name: string }[]): GameState {
   const { playerCards, drawPile } = deal(playerInfos.length);
 
-  const players: Player[] = playerInfos.map((info, i) => ({
-    id: info.id,
-    name: info.name,
-    hand: playerCards[i].hand,
-    faceUp: playerCards[i].faceUp,
-    faceDown: playerCards[i].faceDown,
-    connected: true,
-    ready: false,
-  }));
+  const players: Player[] = playerInfos.map((info, i) => {
+    const hand = playerCards[i].hand;
+    sortHand(hand);
+    return {
+      id: info.id,
+      name: info.name,
+      hand,
+      faceUp: playerCards[i].faceUp,
+      faceDown: playerCards[i].faceDown,
+      connected: true,
+      ready: false,
+    };
+  });
 
   return {
     phase: 'swapping',
@@ -33,6 +37,7 @@ export function createGame(playerInfos: { id: string; name: string }[]): GameSta
     mustPlayLower: false,
     lastAction: 'Game started — swap your cards!',
     loserId: null,
+    winnerId: null,
     finishedPlayerIds: [],
   };
 }
@@ -59,6 +64,15 @@ export function swapCards(
   const temp = player.hand[handIdx];
   player.hand[handIdx] = player.faceUp[faceUpIdx];
   player.faceUp[faceUpIdx] = temp;
+
+  // Re-sort hand after swap
+  player.hand.sort((a, b) => {
+    const aVal = RANK_ORDER[a.rank];
+    const bVal = RANK_ORDER[b.rank];
+    if (aVal !== bVal) return aVal - bVal;
+    const suitOrder: Record<string, number> = { clubs: 0, spades: 1, diamonds: 2, hearts: 3 };
+    return suitOrder[a.suit] - suitOrder[b.suit];
+  });
 
   return { ...state, lastAction: `${player.name} swapped a card` };
 }
@@ -111,6 +125,7 @@ export interface PlayCardsResult {
   effect?: string;
   burned: boolean;
   pickedUpInstead?: boolean;
+  playedRanks: Rank[];
 }
 
 export function playCards(
@@ -146,13 +161,19 @@ export function playCards(
       newState.pile = [];
       newState.mustPlayLower = false;
       newState.mustPickUp = false;
+      sortHand(newPlayer.hand);
       newState = advanceTurn(newState);
       newState.lastAction = `${newPlayer.name} flipped ${formatCard(card)} — had to pick up!`;
-      return { state: newState, burned: false, pickedUpInstead: true };
+      return { state: newState, burned: false, pickedUpInstead: true, playedRanks: [card.rank] };
     }
 
     // Valid blind play — proceed normally
-    newState.pile.push(card);
+    // Red 6s are always burnt, never go in the pile
+    if (card.rank === '6' && isRedSuit(card.suit)) {
+      newState.burnPile.push(card);
+    } else {
+      newState.pile.push(card);
+    }
     const result = applySpecialEffects(newState, [card]);
     newState = result.state;
 
@@ -166,7 +187,7 @@ export function playCards(
     newState.lastAction = `${newPlayer.name} flipped ${formatCard(card)}`;
     if (result.effect) newState.lastAction += ` — ${result.effect}`;
 
-    return { state: checkGameOver(newState), effect: result.effect, burned: result.burned };
+    return { state: checkGameOver(newState), effect: result.effect, burned: result.burned, playedRanks: [card.rank] };
   }
 
   // ── Normal play (hand or face-up) ─────────────────────
@@ -177,8 +198,17 @@ export function playCards(
     cards.push(arr.splice(idx, 1)[0]);
   }
 
-  // Add to pile
-  newState.pile.push(...cards);
+  // Red 6s never go into the pile — they are always burnt
+  // Black 6s played alongside a red 6 are invisible (go to pile normally)
+  const red6s = cards.filter(c => c.rank === '6' && isRedSuit(c.suit));
+  const nonRed6s = cards.filter(c => !(c.rank === '6' && isRedSuit(c.suit)));
+
+  if (red6s.length > 0) {
+    newState.burnPile.push(...red6s);
+  }
+
+  // Add remaining cards (non-red-6) to pile
+  newState.pile.push(...nonRed6s);
 
   // Apply special effects
   const result = applySpecialEffects(newState, cards);
@@ -204,7 +234,7 @@ export function playCards(
   newState.lastAction = `${newPlayer.name} played ${cardStr}`;
   if (result.effect) newState.lastAction += ` — ${result.effect}`;
 
-  return { state: checkGameOver(newState), effect: result.effect, burned: result.burned };
+  return { state: checkGameOver(newState), effect: result.effect, burned: result.burned, playedRanks: cards.map(c => c.rank) };
 }
 
 // ── Pick Up Pile ────────────────────────────────────────────
@@ -224,6 +254,7 @@ export function pickUpPile(state: GameState, playerId: string): GameState | { er
   newState.pile = [];
   newState.mustPlayLower = false;
   newState.mustPickUp = false;
+  sortHand(player.hand);
   newState.lastAction = `${player.name} picked up ${player.hand.length} cards`;
 
   // Remove from finished if they were somehow there
@@ -270,6 +301,27 @@ function drawCards(state: GameState, playerIndex: number): void {
   while (player.hand.length < 3 && state.drawPile.length > 0) {
     player.hand.push(state.drawPile.pop()!);
   }
+  sortHand(player.hand);
+}
+
+/** Sort hand from worst to best (left to right) based on game value */
+/** Sort hand from weakest to strongest (left to right).
+ *  Regular cards by rank, then special cards (2, 3, 10) at the far right
+ *  since they're the most powerful utility cards. */
+function sortHand(hand: Card[]): void {
+  // Game-power sort order: 4,5,6,7,8,9,J,Q,K,A, then specials 3,2,10
+  const SORT_ORDER: Record<string, number> = {
+    '4': 1, '5': 2, '6': 3, '7': 4, '8': 5, '9': 6,
+    'J': 7, 'Q': 8, 'K': 9, 'A': 10,
+    '3': 11, '2': 12, '10': 13, // specials at the end (strongest)
+  };
+  hand.sort((a, b) => {
+    const aVal = SORT_ORDER[a.rank] ?? 0;
+    const bVal = SORT_ORDER[b.rank] ?? 0;
+    if (aVal !== bVal) return aVal - bVal;
+    const suitOrder: Record<string, number> = { clubs: 0, spades: 1, diamonds: 2, hearts: 3 };
+    return suitOrder[a.suit] - suitOrder[b.suit];
+  });
 }
 
 function checkPlayerFinished(state: GameState, playerIndex: number): GameState {
@@ -281,6 +333,10 @@ function checkPlayerFinished(state: GameState, playerIndex: number): GameState {
     !state.finishedPlayerIds.includes(player.id)
   ) {
     state.finishedPlayerIds.push(player.id);
+    // First player to finish is the winner
+    if (!state.winnerId) {
+      state.winnerId = player.id;
+    }
   }
   return state;
 }
@@ -292,11 +348,14 @@ function checkGameOver(state: GameState): GameState {
 
   if (activePlayers.length <= 1 && state.players.length > 1) {
     const loser = activePlayers[0];
+    const winner = state.winnerId ? state.players.find(p => p.id === state.winnerId) : null;
     return {
       ...state,
       phase: 'game-over',
       loserId: loser?.id ?? null,
-      lastAction: loser ? `${loser.name} is the Shithead!` : 'Game over!',
+      lastAction: winner && loser
+        ? `${winner.name} wins! ${loser.name} is the SHITHEAD!`
+        : 'Game over!',
     };
   }
 
@@ -342,11 +401,13 @@ export function getClientState(state: GameState, playerId: string): ClientGameSt
           hand: player.hand,
           faceUp: player.faceUp,
           faceDownCount: player.faceDown.length,
+          faceDownIds: player.faceDown.map(c => c.id),
         }
-      : { id: playerId, name: 'Unknown', hand: [], faceUp: [], faceDownCount: 0 },
+      : { id: playerId, name: 'Unknown', hand: [], faceUp: [], faceDownCount: 0, faceDownIds: [] },
     opponents,
     pileTop: state.pile.slice(-4),
     pileCount: state.pile.length,
+    effectiveCard: getEffectivePileTop(state.pile),
     drawPileCount: state.drawPile.length,
     currentPlayerId: currentPlayer?.id ?? '',
     direction: state.direction,
@@ -357,6 +418,8 @@ export function getClientState(state: GameState, playerId: string): ClientGameSt
     lastAction: state.lastAction,
     loserId: state.loserId,
     loserName: loser?.name ?? null,
+    winnerId: state.winnerId,
+    winnerName: state.winnerId ? state.players.find(p => p.id === state.winnerId)?.name ?? null : null,
     playerOrder: state.players.map(p => ({ id: p.id, name: p.name, connected: p.connected })),
     finishedPlayerIds: state.finishedPlayerIds,
   };

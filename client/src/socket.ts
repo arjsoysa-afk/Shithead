@@ -1,7 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import type { ServerToClientEvents, ClientToServerEvents } from '../../shared/types';
 
-const URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
+// In dev, connect via Vite proxy (same origin) so preview browsers can reach the server
+const URL = import.meta.env.DEV ? '' : '';
 
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(URL, {
   autoConnect: true,

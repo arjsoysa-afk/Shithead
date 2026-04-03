@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
 import { Hand } from './Hand';
-import { FaceUpCards } from './FaceUpCards';
-import { FaceDownCards } from './FaceDownCards';
+import { Card } from './Card';
 import { Pile } from './Pile';
 import { DrawPile } from './DrawPile';
 import { OpponentRow } from './OpponentRow';
-import type { ClientGameState, Card as CardType } from '../../../shared/types';
+import { PlayerAvatar } from './Avatar';
+import type { ClientGameState, Card as CardType, PlayerStats } from '../../../shared/types';
+
+const CYBER_COLORS = ['#bf5af2','#00f0ff','#ff6bcb','#00ff87','#ffd60a','#7b61ff'];
 
 interface GameBoardProps {
   gameState: ClientGameState;
@@ -13,6 +15,8 @@ interface GameBoardProps {
   onToggleCard: (cardId: string, card: CardType) => void;
   onPlayCards: () => void;
   onPickUp: () => void;
+  onPlayFaceDown: (cardId: string) => void;
+  loadStats: () => PlayerStats;
 }
 
 export function GameBoard({
@@ -21,6 +25,8 @@ export function GameBoard({
   onToggleCard,
   onPlayCards,
   onPickUp,
+  onPlayFaceDown,
+  loadStats,
 }: GameBoardProps) {
   const { you, opponents, pileTop, pileCount, drawPileCount, isYourTurn, mustPickUp, mustPlayLower, direction, lastAction, currentPlayerId } = gameState;
 
@@ -29,17 +35,113 @@ export function GameBoard({
   const hasFaceDown = you.faceDownCount > 0;
   const isFinished = gameState.finishedPlayerIds.includes(you.id);
 
+  // Build player ID → avatar index mapping from playerOrder
+  const avatarMap = new Map<string, number>();
+  gameState.playerOrder.forEach((p, i) => avatarMap.set(p.id, i));
+  const myAvatarIndex = avatarMap.get(you.id) ?? 0;
+
   // Position opponents around the table
   const opponentPositions = getOpponentPositions(opponents.length);
 
   return (
-    <div className="h-screen w-screen relative overflow-hidden bg-bg-primary">
-      {/* Table surface */}
-      <div className="absolute inset-0"
-        style={{
-          background: 'radial-gradient(ellipse at 50% 45%, rgba(20,20,40,0.9) 0%, #08080d 80%)',
-        }}
-      />
+    <div className="h-screen w-screen relative overflow-hidden">
+
+      {/* Head-to-head scoreboard — top right */}
+      {(() => {
+        const stats = loadStats();
+        const h2h = stats.headToHead;
+        const opponentNames = opponents.map(o => o.name);
+        const entries = opponentNames
+          .map(name => ({ name, record: h2h[name] }))
+          .filter(e => e.record);
+
+        return (
+          <div className="absolute top-4 right-4 z-30 flex flex-col items-end gap-1.5"
+            style={{
+              background: 'rgba(10,10,24,0.6)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(191,90,242,0.15)',
+              borderRadius: '12px',
+              padding: '10px 14px',
+            }}>
+            <div className="text-[10px] uppercase tracking-widest mb-0.5"
+              style={{ fontFamily: "'CyberSlash', sans-serif", color: 'rgba(191,90,242,0.5)' }}>
+              Head to Head
+            </div>
+            {opponentNames.map((name) => {
+              const record = h2h[name] || { wins: 0, losses: 0 };
+              const oppIdx = gameState.playerOrder.findIndex(p => p.name === name);
+              const oppColor = CYBER_COLORS[oppIdx >= 0 ? oppIdx % CYBER_COLORS.length : 0];
+              const myIdx = gameState.playerOrder.findIndex(p => p.id === you.id);
+              const myColor = CYBER_COLORS[myIdx >= 0 ? myIdx % CYBER_COLORS.length : 0];
+              return (
+                <div key={name} className="flex items-center gap-2 text-sm">
+                  <span style={{ fontFamily: "'CyberSlash', sans-serif", color: myColor, textShadow: `0 0 8px ${myColor}50` }}>
+                    {you.name}
+                  </span>
+                  <span className="text-white/80 font-mono text-xs">
+                    <span className="text-green-400">{record.wins}</span>
+                    <span className="text-white/40"> - </span>
+                    <span className="text-red-400">{record.losses}</span>
+                  </span>
+                  <span style={{ fontFamily: "'CyberSlash', sans-serif", color: oppColor, textShadow: `0 0 8px ${oppColor}50` }}>
+                    {name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* Opponent names — fixed top-left */}
+      <div className="fixed top-4 left-4 z-30 flex flex-col gap-4">
+        {opponents.map((opp, i) => {
+          const oppAvatarIdx = avatarMap.get(opp.id) ?? i + 1;
+          const oppColor = CYBER_COLORS[oppAvatarIdx % CYBER_COLORS.length];
+          const isOppTurn = currentPlayerId === opp.id;
+          const oppFinished = gameState.finishedPlayerIds.includes(opp.id);
+          return (
+            <div key={opp.id} className={`flex items-center gap-3 ${!opp.connected ? 'opacity-50' : ''} ${oppFinished ? 'opacity-40' : ''}`}>
+              <PlayerAvatar index={oppAvatarIdx} size={48} />
+              <div className="flex items-center gap-1.5">
+                <div className={`w-3 h-3 rounded-full ${
+                  !opp.connected ? 'bg-danger' :
+                  isOppTurn ? 'bg-accent animate-pulse' :
+                  'bg-success'
+                }`} />
+                <span className="text-4xl" style={{
+                  fontFamily: "'CyberSlash', sans-serif",
+                  color: oppColor,
+                  textShadow: `0 0 14px ${oppColor}60`,
+                }}>{opp.name}</span>
+                {oppFinished && <span className="text-success text-sm">(out)</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Your name — fixed bottom-left */}
+      {(() => {
+        const myColor = CYBER_COLORS[myAvatarIndex % CYBER_COLORS.length];
+        return (
+          <div className={`fixed bottom-4 left-4 z-30 flex items-center gap-3 ${isFinished ? 'opacity-40' : ''}`}>
+            <PlayerAvatar index={myAvatarIndex} size={48} />
+            <div className="flex items-center gap-1.5">
+              <div className={`w-3 h-3 rounded-full ${
+                isYourTurn ? 'bg-accent animate-pulse' : 'bg-success'
+              }`} />
+              <span className="text-4xl" style={{
+                fontFamily: "'CyberSlash', sans-serif",
+                color: myColor,
+                textShadow: `0 0 14px ${myColor}60`,
+              }}>{you.name}</span>
+              {isFinished && <span className="text-success text-sm">(out)</span>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Direction indicator */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
@@ -64,120 +166,149 @@ export function GameBoard({
             opponent={opp}
             isCurrentTurn={currentPlayerId === opp.id}
             isFinished={gameState.finishedPlayerIds.includes(opp.id)}
+            avatarIndex={avatarMap.get(opp.id) ?? i + 1}
           />
         </div>
       ))}
 
-      {/* Center area: draw pile + discard pile */}
-      <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2
-        flex items-center gap-8">
+      {/* Center area: draw pile + discard pile — always visible */}
+      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2
+        flex items-center gap-8 z-10">
         <DrawPile count={drawPileCount} />
-        <Pile topCards={pileTop} count={pileCount} />
+        <Pile topCards={pileTop} count={pileCount} effectiveCard={gameState.effectiveCard} />
       </div>
 
-      {/* Last action */}
-      <div className="absolute top-[55%] left-1/2 -translate-x-1/2
-        text-text-muted text-xs text-center max-w-sm">
-        {lastAction}
-      </div>
-
-      {/* Turn banner */}
-      <div className="absolute bottom-56 left-1/2 -translate-x-1/2 z-20">
+      {/* Status notification — fixed bottom right */}
+      <div className="absolute bottom-4 right-4 z-30">
         {isYourTurn && !isFinished ? (
           <motion.div
-            className="px-6 py-2 rounded-full bg-accent/10 border border-accent/20
-              text-accent text-sm font-medium backdrop-blur-sm whitespace-nowrap
-              flex items-center gap-3"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            className="px-5 py-2 rounded-xl flex flex-col items-end gap-0.5"
+            style={{
+              background: 'rgba(10,10,24,0.7)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(191,90,242,0.2)',
+            }}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            key={lastAction}
           >
-            {mustPickUp ? (
-              <>Pick up or play a black 6 to deflect</>
-            ) : mustPlayLower ? (
-              <>Play lower than 7</>
-            ) : (
-              <>
-                Your turn — select cards and press
-                <kbd className="inline-flex items-center justify-center min-w-[24px] h-5 px-1.5
-                  bg-accent/15 border border-accent/30 rounded text-[11px] font-semibold">
-                  Enter
-                </kbd>
-              </>
-            )}
+            <div className="text-[10px]" style={{ color: 'rgba(191,90,242,0.4)' }}>{lastAction}</div>
+            <div className="text-sm font-medium" style={{ color: '#bf5af2', fontFamily: "'CyberSlash', sans-serif" }}>
+              {mustPickUp ? (
+                <>Pick up or deflect</>
+              ) : mustPlayLower ? (
+                <>Play lower than 7</>
+              ) : (
+                <>Your turn</>
+              )}
+            </div>
           </motion.div>
         ) : isFinished ? (
-          <div className="px-6 py-2 rounded-full bg-success/10 border border-success/20
-            text-success text-sm font-medium">
-            You're out! Waiting for others...
-          </div>
+          <motion.div
+            className="px-5 py-2 rounded-xl flex flex-col items-end gap-0.5"
+            style={{
+              background: 'rgba(10,10,24,0.7)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(0,214,143,0.2)',
+            }}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <div className="text-[10px]" style={{ color: 'rgba(0,214,143,0.4)' }}>{lastAction}</div>
+            <div className="text-sm font-medium text-success" style={{ fontFamily: "'CyberSlash', sans-serif" }}>
+              You're out!
+            </div>
+          </motion.div>
         ) : (
-          <div className="px-6 py-2 rounded-full bg-white/[0.03] border border-border
-            text-text-muted text-sm whitespace-nowrap">
-            Waiting for {gameState.playerOrder.find(p => p.id === currentPlayerId)?.name}...
-          </div>
+          <motion.div
+            className="px-5 py-2 rounded-xl flex flex-col items-end gap-0.5"
+            style={{
+              background: 'rgba(10,10,24,0.7)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            key={lastAction}
+          >
+            <div className="text-[10px]" style={{ color: 'rgba(191,90,242,0.4)' }}>{lastAction}</div>
+            <div className="text-sm" style={{ color: 'rgba(191,90,242,0.5)', fontFamily: "'CyberSlash', sans-serif" }}>
+              Waiting for {gameState.playerOrder.find(p => p.id === currentPlayerId)?.name}...
+            </div>
+          </motion.div>
         )}
       </div>
 
-      {/* Player area (bottom) */}
-      <div className="absolute bottom-0 left-0 right-0 pb-6 px-4">
-        {/* Face-down + face-up cards row */}
-        {(!hasHand && (hasFaceUp || hasFaceDown)) && (
-          <div className="flex justify-center gap-8 mb-4">
-            {hasFaceDown && (
-              <div className="text-center">
-                <div className="text-[10px] uppercase tracking-widest text-text-muted mb-2">Face Down</div>
-                <FaceDownCards
-                  count={you.faceDownCount}
-                  onClickCard={isYourTurn && !hasFaceUp ? (i) => {
-                    // For face-down, we need the actual card ID from somewhere
-                    // The server handles this — we just send a click index
-                    // Actually we send cardIds, but client doesn't know face-down IDs
-                    // This is handled by sending a special event
-                  } : undefined}
-                />
-              </div>
-            )}
-            {hasFaceUp && !hasHand && (
-              <div className="text-center">
-                <div className="text-[10px] uppercase tracking-widest text-text-muted mb-2">Face Up</div>
-                <FaceUpCards
-                  cards={you.faceUp}
-                  selectedIds={selectedCardIds}
-                  onToggleCard={isYourTurn ? onToggleCard : undefined}
-                  disabled={!isYourTurn}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Show face-up and face-down when playing from hand (non-interactive) */}
-        {hasHand && (hasFaceUp || hasFaceDown) && (
-          <div className="flex justify-center gap-6 mb-3">
-            {hasFaceDown && (
-              <div className="text-center">
-                <div className="text-[9px] uppercase tracking-widest text-text-muted mb-1">Face Down</div>
-                <FaceDownCards count={you.faceDownCount} small />
-              </div>
-            )}
-            {hasFaceUp && (
-              <div className="text-center">
-                <div className="text-[9px] uppercase tracking-widest text-text-muted mb-1">Face Up</div>
-                <FaceUpCards cards={you.faceUp} small disabled />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Hand */}
+      {/* Player area (bottom) — sits below deck/pile, never overlaps */}
+      <div className="absolute bottom-0 left-0 right-0 pb-2 px-4 flex flex-col items-center" style={{ maxHeight: '50vh' }}>
+        {/* Hand (on top) */}
         {hasHand && (
-          <Hand
-            cards={you.hand}
-            selectedIds={selectedCardIds}
-            onToggleCard={onToggleCard}
-            disabled={!isYourTurn}
-          />
+          <motion.div
+            className="w-full"
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+          >
+            <Hand
+              cards={you.hand}
+              selectedIds={selectedCardIds}
+              onToggleCard={onToggleCard}
+              disabled={!isYourTurn}
+            />
+          </motion.div>
         )}
+
+        {/* Table cards */}
+        {(() => {
+          const isPlayingFaceUp = !hasHand && hasFaceUp;
+          const isPlayingFaceDown = !hasHand && !hasFaceUp && hasFaceDown;
+
+          const faceDownRow = (hasFaceDown || hasFaceUp) && (
+            <div className="flex justify-center items-center mt-1">
+              <div className="flex gap-2">
+                {Array.from({ length: Math.max(you.faceDownCount, you.faceUp.length) }).map((_, i) => {
+                  const hasFD = i < you.faceDownCount;
+                  const faceUpCard = you.faceUp[i];
+                  const isFaceUpPlayable = isPlayingFaceUp && faceUpCard;
+                  const isFaceDownPlayable = isPlayingFaceDown && hasFD;
+
+                  return (
+                    <div key={i} className="relative" style={{ width: 48, height: hasFD && faceUpCard ? 82 : 64 }}>
+                      {hasFD && (
+                        <div className="absolute top-0 left-0" style={{ zIndex: 1 }}>
+                          <Card
+                            small
+                            index={i}
+                            onClick={isFaceDownPlayable && isYourTurn ? () => onPlayFaceDown(you.faceDownIds[i]) : undefined}
+                          />
+                        </div>
+                      )}
+                      {faceUpCard && (
+                        <div className="absolute left-0" style={{ top: hasFD ? 16 : 0, zIndex: 2 }}>
+                          <Card
+                            card={faceUpCard}
+                            small
+                            disabled={!isFaceUpPlayable || !isYourTurn}
+                            selected={isFaceUpPlayable ? selectedCardIds?.has(faceUpCard.id) : false}
+                            onClick={isFaceUpPlayable && isYourTurn ? () => onToggleCard(faceUpCard.id, faceUpCard) : undefined}
+                            index={i}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+
+          // If no table cards at all (all gone), nothing to show here
+          if (!hasFaceDown && !hasFaceUp) {
+            return null;
+          }
+
+          return faceDownRow;
+        })()}
 
         {/* Action buttons */}
         {isYourTurn && !isFinished && (

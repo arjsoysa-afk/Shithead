@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Font Mood Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Chakra+Petch:wght@700&family=Audiowide&family=Rubik+Glitch&family=Rajdhani:wght@700&family=Bungee+Shade&family=Press+Start+2P&family=Silkscreen:wght@700&family=Black+Ops+One&family=Teko:wght@700&family=Michroma&family=Russo+One&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #08080d;
+    color: white;
+    font-family: sans-serif;
+    padding: 30px;
+  }
+  h2 {
+    color: #bf5af2;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .card {
+    background: linear-gradient(160deg, #14141f, #0c0c1a);
+    border: 1px solid rgba(191,90,242,0.15);
+    border-radius: 16px;
+    padding: 30px 20px;
+    text-align: center;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .card:hover {
+    border-color: rgba(191,90,242,0.5);
+    box-shadow: 0 0 30px rgba(191,90,242,0.1);
+  }
+  .card .title {
+    font-size: 42px;
+    color: #bf5af2;
+    text-shadow: 0 0 10px rgba(191,90,242,0.5), 0 0 40px rgba(191,90,242,0.2);
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+  .card .label {
+    font-size: 11px;
+    color: rgba(191,90,242,0.4);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-family: 'Inter', sans-serif;
+  }
+  .card .num {
+    position: absolute;
+    top: 10px;
+    left: 14px;
+    font-size: 11px;
+    color: rgba(191,90,242,0.3);
+    font-family: monospace;
+  }
+  .card { position: relative; }
+
+  /* Skewed variants */
+  .skew .title { transform: skewX(-10deg); }
+</style>
+</head>
+<body>
+  <h2>Pick a font — click to imagine it as the logo</h2>
+  <div class="grid">
+
+    <div class="card">
+      <span class="num">01</span>
+      <div class="title" style="font-family: 'Orbitron', sans-serif;">SHITHEAD</div>
+      <div class="label">Orbitron — Geometric Sci-Fi</div>
+    </div>
+
+    <div class="card skew">
+      <span class="num">02</span>
+      <div class="title" style="font-family: 'Chakra Petch', sans-serif;">SHITHEAD</div>
+      <div class="label">Chakra Petch — Angular Pointed</div>
+    </div>
+
+    <div class="card">
+      <span class="num">03</span>
+      <div class="title" style="font-family: 'Audiowide', sans-serif;">SHITHEAD</div>
+      <div class="label">Audiowide — Rounded Futuristic</div>
+    </div>
+
+    <div class="card skew">
+      <span class="num">04</span>
+      <div class="title" style="font-family: 'Rajdhani', sans-serif;">SHITHEAD</div>
+      <div class="label">Rajdhani — Sharp Condensed</div>
+    </div>
+
+    <div class="card">
+      <span class="num">05</span>
+      <div class="title" style="font-family: 'Rubik Glitch', system-ui;">SHITHEAD</div>
+      <div class="label">Rubik Glitch — Distorted Digital</div>
+    </div>
+
+    <div class="card">
+      <span class="num">06</span>
+      <div class="title" style="font-family: 'Bungee Shade', sans-serif; font-size: 32px;">SHITHEAD</div>
+      <div class="label">Bungee Shade — Retro 3D Block</div>
+    </div>
+
+    <div class="card skew">
+      <span class="num">07</span>
+      <div class="title" style="font-family: 'Black Ops One', sans-serif;">SHITHEAD</div>
+      <div class="label">Black Ops One — Military Stencil</div>
+    </div>
+
+    <div class="card">
+      <span class="num">08</span>
+      <div class="title" style="font-family: 'Teko', sans-serif; letter-spacing: 8px;">SHITHEAD</div>
+      <div class="label">Teko — Tall Industrial</div>
+    </div>
+
+    <div class="card">
+      <span class="num">09</span>
+      <div class="title" style="font-family: 'Michroma', sans-serif; font-size: 30px;">SHITHEAD</div>
+      <div class="label">Michroma — Wide Tech</div>
+    </div>
+
+    <div class="card skew">
+      <span class="num">10</span>
+      <div class="title" style="font-family: 'Russo One', sans-serif;">SHITHEAD</div>
+      <div class="label">Russo One — Bold Angular</div>
+    </div>
+
+    <div class="card">
+      <span class="num">11</span>
+      <div class="title" style="font-family: 'Silkscreen', monospace; font-size: 28px;">SHITHEAD</div>
+      <div class="label">Silkscreen — Pixel Retro</div>
+    </div>
+
+    <div class="card">
+      <span class="num">12</span>
+      <div class="title" style="font-family: 'Press Start 2P', monospace; font-size: 20px;">SHITHEAD</div>
+      <div class="label">Press Start 2P — 8-bit Arcade</div>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,4 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;500;600;700;800;900&family=Megrim&family=Chakra+Petch:wght@300;400;500;600;700&family=Rubik+Glitch&display=swap');
+
+@font-face {
+  font-family: 'CyberSlash';
+  src: url('/fonts/true-lies.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -8,6 +16,64 @@
   body {
     @apply bg-bg-primary text-text-primary font-sans antialiased;
     overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Cyberpunk background pattern - applied globally */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      /* Perspective grid floor */
+      linear-gradient(transparent 0%, transparent 60%, rgba(191,90,242,0.02) 60%, rgba(191,90,242,0.04) 100%),
+      /* Horizontal grid lines */
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 59px,
+        rgba(191,90,242,0.03) 59px,
+        rgba(191,90,242,0.03) 60px
+      ),
+      /* Vertical grid lines */
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 59px,
+        rgba(191,90,242,0.03) 59px,
+        rgba(191,90,242,0.03) 60px
+      );
+  }
+
+  /* Scanline overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(191,90,242,0.012) 3px,
+        rgba(191,90,242,0.012) 4px
+      );
+    animation: scanline-drift 8s linear infinite;
+  }
+
+  @keyframes scanline-drift {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(4px); }
+  }
+
+  /* Ensure content sits above background */
+  body > #root {
+    position: relative;
+    z-index: 1;
   }
 
   ::selection {

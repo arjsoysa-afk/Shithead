@@ -13,7 +13,9 @@ export const RANK_ORDER: Record<Rank, number> = {
   '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14,
 };
 
+// Cards that can be played on anything (true "magic" cards)
 export const SPECIAL_RANKS = new Set<Rank>(['2', '3', '10']);
+// 7 is special (play-lower effect) but follows normal rank rules + cannot go on Ace
 
 export function isRedSuit(suit: Suit): boolean {
   return suit === 'hearts' || suit === 'diamonds';
@@ -25,13 +27,14 @@ export function isBlackSuit(suit: Suit): boolean {
 
 // ── Player Types ────────────────────────────────────────────
 export interface Player {
-  id: string;           // socket.id
+  id: string;           // socket.id or "bot-xxx" for bots
   name: string;
   hand: Card[];
   faceUp: Card[];
   faceDown: Card[];
   connected: boolean;
   ready: boolean;       // swap phase readiness
+  isBot?: boolean;      // true for computer players
 }
 
 export interface OpponentView {
@@ -59,7 +62,8 @@ export interface GameState {
   mustPlayLower: boolean;    // 7 effect active
   lastAction: string;
   loserId: string | null;
-  finishedPlayerIds: string[]; // players who have emptied all cards
+  winnerId: string | null;     // first player to get rid of all cards
+  finishedPlayerIds: string[]; // players who have emptied all cards (in order)
 }
 
 export interface ClientGameState {
@@ -70,10 +74,12 @@ export interface ClientGameState {
     hand: Card[];
     faceUp: Card[];
     faceDownCount: number;
+    faceDownIds: string[];  // IDs only (no rank/suit) so player can click to play blind
   };
   opponents: OpponentView[];
   pileTop: Card[];          // top 4 cards for display/validation context
   pileCount: number;
+  effectiveCard: Card | null; // the card you need to beat (skips 3s) — shown peeking out
   drawPileCount: number;
   currentPlayerId: string;
   direction: PlayDirection;
@@ -84,6 +90,8 @@ export interface ClientGameState {
   lastAction: string;
   loserId: string | null;
   loserName: string | null;
+  winnerId: string | null;
+  winnerName: string | null;
   playerOrder: { id: string; name: string; connected: boolean }[];
   finishedPlayerIds: string[];
 }
@@ -104,6 +112,7 @@ export interface ServerToClientEvents {
   'game-state': (state: ClientGameState) => void;
   'card-played': (data: { playerId: string; playerName: string; cards: Card[]; effect?: string }) => void;
   'pile-burned': (data: { reason: string; playerId: string; playerName: string }) => void;
+  'special-effect': (data: { effect: 'FOOF' | 'MEGATRON' | 'DESTROYED'; playerName: string }) => void;
   'pile-picked-up': (data: { playerId: string; playerName: string; cardCount: number }) => void;
   'invalid-move': (data: { reason: string }) => void;
   'game-over': (data: { loserId: string; loserName: string; stats: GameEndStats }) => void;
@@ -119,6 +128,7 @@ export interface ClientToServerEvents {
   'play-cards': (data: { cardIds: string[] }) => void;
   'pick-up-pile': () => void;
   'play-again': () => void;
+  'play-vs-computer': (data: { playerName: string }) => void;
 }
 
 // ── Stats Types ─────────────────────────────────────────────

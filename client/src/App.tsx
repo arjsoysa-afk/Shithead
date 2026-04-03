@@ -10,6 +10,8 @@ import { GameOver } from './components/GameOver';
 import { Stats } from './components/Stats';
 import { ToastContainer } from './components/Toast';
 import { KeyboardHelp } from './components/KeyboardHelp';
+import { FloatingEffect } from './components/FloatingEffect';
+import { CyberpunkBg } from './components/CyberpunkBg';
 import type { GameEndStats, PlayerStats } from '../../shared/types';
 
 export default function App() {
@@ -18,14 +20,17 @@ export default function App() {
     gameState,
     roomInfo,
     toasts,
+    specialEffects,
     selectedCardIds,
     createRoom,
     joinRoom,
+    playVsComputer,
     startGame,
     swapCards,
     ready,
     playSelectedCards,
     pickUpPile,
+    playFaceDown,
     playAgain,
     toggleCardSelection,
     selectAllSameRank,
@@ -72,15 +77,18 @@ export default function App() {
   // Stats view
   if (showStats) {
     const stats = loadStats();
-    return <Stats stats={stats} onClose={() => setShowStats(false)} />;
+    return <><CyberpunkBg /><Stats stats={stats} onClose={() => setShowStats(false)} /></>;
   }
 
   // Connection indicator
   if (!connected) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-text-muted animate-pulse">Connecting...</div>
-      </div>
+      <>
+        <CyberpunkBg />
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-text-muted animate-pulse">Connecting...</div>
+        </div>
+      </>
     );
   }
 
@@ -89,6 +97,7 @@ export default function App() {
     if (gameState.phase === 'swapping') {
       return (
         <>
+          <CyberpunkBg />
           <SwapPhase gameState={gameState} onSwap={swapCards} onReady={ready} />
           <ToastContainer toasts={toasts} />
         </>
@@ -99,6 +108,7 @@ export default function App() {
       const isHost = roomInfo?.hostId === socket.id;
       return (
         <>
+          <CyberpunkBg />
           <GameOver
             gameState={gameState}
             stats={endGameStats}
@@ -114,13 +124,17 @@ export default function App() {
     if (gameState.phase === 'playing') {
       return (
         <>
+          <CyberpunkBg />
           <GameBoard
             gameState={gameState}
             selectedCardIds={selectedCardIds}
             onToggleCard={toggleCardSelection}
             onPlayCards={playSelectedCards}
             onPickUp={pickUpPile}
+            onPlayFaceDown={playFaceDown}
+            loadStats={loadStats}
           />
+          <FloatingEffect effects={specialEffects} />
           <ToastContainer toasts={toasts} />
           <KeyboardHelp show={showHelp} onClose={() => setShowHelp(false)} />
         </>
@@ -131,11 +145,13 @@ export default function App() {
   // Lobby
   return (
     <>
+      <CyberpunkBg />
       <Lobby
         roomInfo={roomInfo}
         socketId={socket.id ?? ''}
         onCreateRoom={createRoom}
         onJoinRoom={joinRoom}
+        onPlayVsComputer={playVsComputer}
         onStartGame={startGame}
         onShowStats={() => setShowStats(true)}
       />

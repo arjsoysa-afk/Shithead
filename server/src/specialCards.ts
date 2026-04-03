@@ -71,15 +71,21 @@ export function applySpecialEffects(state: GameState, playedCards: Card[]): Play
       break;
 
     case '6': {
-      // Red 6: next player must pick up
-      // Black 6: deflects a red 6
-      const card = playedCards[0];
-      if (isRedSuit(card.suit)) {
+      // Check if ANY of the played cards is a red 6
+      const hasRed6 = playedCards.some(c => isRedSuit(c.suit));
+      const allBlack = playedCards.every(c => isBlackSuit(c.suit));
+      const blackCount = playedCards.filter(c => isBlackSuit(c.suit)).length;
+
+      if (hasRed6) {
+        // Red 6 always attacks — any black 6s played alongside are invisible (like a 3)
+        // Only a black 6 from the NEXT player can cancel it
         result.state.mustPickUp = true;
-        result.effect = 'Red 6 — next player picks up!';
-      } else if (isBlackSuit(card.suit) && state.mustPickUp) {
-        // Deflect — mustPickUp stays true, passes to next player
-        result.effect = 'Black 6 — deflected!';
+        result.effect = 'Red 6 — pick up or play a black 6!';
+      } else if (allBlack && state.mustPickUp) {
+        // Black 6 cancels the red 6 — nobody picks up
+        // Play continues normally from 6 (next player must play 6 or higher)
+        result.state.mustPickUp = false;
+        result.effect = 'Black 6 — cancelled! Play continues from 6';
       }
       break;
     }

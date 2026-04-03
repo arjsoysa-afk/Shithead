@@ -16,7 +16,8 @@ const io = new Server(httpServer, {
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
-  const clientDist = path.join(__dirname, '../../../../client/dist');
+  // __dirname = server/dist/server/src — go up to monorepo root, then into client/dist
+  const clientDist = path.resolve(__dirname, '../../../../client/dist');
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));

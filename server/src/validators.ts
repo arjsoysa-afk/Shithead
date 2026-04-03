@@ -27,7 +27,7 @@ export function canPlayOn(
     return playRank === '6' && isBlackSuit(playSuit);
   }
 
-  // Special cards can always be played (except 7 on ace — handled separately)
+  // Special cards (2, 3, 10) can always be played on anything
   if (SPECIAL_RANKS.has(playRank)) {
     return true;
   }
@@ -37,9 +37,9 @@ export function canPlayOn(
     return true;
   }
 
-  // 7 cannot be played on an Ace
-  if (playRank === '7' && effectiveTop.rank === 'A') {
-    return false;
+  // 7 can be played on anything EXCEPT an Ace
+  if (playRank === '7') {
+    return effectiveTop.rank !== 'A';
   }
 
   // If under a 7's effect, must play lower than 7
@@ -115,13 +115,11 @@ export function isValidPlay(
     return { valid: false, reason: 'Card is too low' };
   }
 
-  // Special case: if mustPickUp and playing black 6, only one black 6 allowed
+  // Special case: if mustPickUp and playing 6s, ALL must be black to deflect
   if (state.mustPickUp && rank === '6') {
-    if (selectedCards.length !== 1) {
-      return { valid: false, reason: 'Can only play one black 6 to deflect' };
-    }
-    if (!isBlackSuit(selectedCards[0].suit)) {
-      return { valid: false, reason: 'Only a black 6 can deflect' };
+    const allBlack = selectedCards.every(c => isBlackSuit(c.suit));
+    if (!allBlack) {
+      return { valid: false, reason: 'Only black 6s can deflect — no red 6s allowed here' };
     }
   }
 

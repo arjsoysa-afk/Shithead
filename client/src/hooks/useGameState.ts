@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { socket } from '../socket';
 import type { ClientGameState, RoomInfo, Card } from '../../../shared/types';
+import type { SpecialEffect } from '../components/FloatingEffect';
 
 interface Toast {
   id: string;
@@ -13,6 +14,8 @@ export function useGameState() {
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+  const [specialEffects, setSpecialEffects] = useState<SpecialEffect[]>([]);
+  const effectTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
     socket.on('game-state', (state) => {
@@ -55,6 +58,17 @@ export function useGameState() {
       addToast(message, 'error');
     });
 
+    socket.on('special-effect', ({ effect, playerName }) => {
+      const id = `${Date.now()}-${Math.random()}`;
+      setSpecialEffects(prev => [...prev, { id, effect, playerName }]);
+      // Auto-remove after 2 seconds
+      const timer = setTimeout(() => {
+        setSpecialEffects(prev => prev.filter(e => e.id !== id));
+        effectTimers.current.delete(id);
+      }, 2000);
+      effectTimers.current.set(id, timer);
+    });
+
     return () => {
       socket.off('game-state');
       socket.off('room-created');
@@ -65,6 +79,9 @@ export function useGameState() {
       socket.off('pile-picked-up');
       socket.off('invalid-move');
       socket.off('error');
+      socket.off('special-effect');
+      // Clean up timers
+      effectTimers.current.forEach(t => clearTimeout(t));
     };
   }, []);
 
@@ -90,6 +107,10 @@ export function useGameState() {
     socket.emit('join-room', { roomCode, playerName });
   }, []);
 
+  const playVsComputer = useCallback((playerName: string) => {
+    socket.emit('play-vs-computer', { playerName });
+  }, []);
+
   const startGame = useCallback(() => {
     socket.emit('start-game');
   }, []);
@@ -110,6 +131,10 @@ export function useGameState() {
 
   const pickUpPile = useCallback(() => {
     socket.emit('pick-up-pile');
+  }, []);
+
+  const playFaceDown = useCallback((cardId: string) => {
+    socket.emit('play-cards', { cardIds: [cardId] });
   }, []);
 
   const playAgain = useCallback(() => {
@@ -164,14 +189,17 @@ export function useGameState() {
     gameState,
     roomInfo,
     toasts,
+    specialEffects,
     selectedCardIds,
     createRoom,
     joinRoom,
+    playVsComputer,
     startGame,
     swapCards,
     ready,
     playSelectedCards,
     pickUpPile,
+    playFaceDown,
     playAgain,
     toggleCardSelection,
     selectAllSameRank,

@@ -8,9 +8,17 @@ import {
 import {
   createGame, swapCards, confirmReady, playCards, pickUpPile, getClientState,
 } from './gameEngine';
+import { chooseBotMove } from './botAI';
 
 type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+
+const BOT_MOVE_DELAY = 1200; // ms delay for bot moves to feel natural
+const BOT_ID_PREFIX = 'bot-';
+
+function isBotId(id: string): boolean {
+  return id.startsWith(BOT_ID_PREFIX);
+}
 
 export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
 
@@ -32,6 +40,47 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
     socket.join(result.code);
     socket.emit('room-joined', getRoomInfo(result));
     io.to(result.code).emit('player-joined', getRoomInfo(result));
+  });
+
+  // ── Play vs Computer ──────────────────────────────────
+  socket.on('play-vs-computer', ({ playerName }) => {
+    // Create room with human player
+    const room = createRoom(socket.id, playerName);
+    socket.join(room.code);
+
+    // Add bot player
+    const botId = `${BOT_ID_PREFIX}${Date.now()}`;
+    room.players.set(botId, { name: 'T-1000', connected: true });
+
+    socket.emit('room-created', { roomCode: room.code });
+    socket.emit('room-joined', getRoomInfo(room));
+
+    // Auto-start game
+    const playerInfos = Array.from(room.players.entries()).map(([id, info]) => ({
+      id,
+      name: info.name,
+      isBot: isBotId(id),
+    }));
+
+    room.gameState = createGame(playerInfos);
+
+    // Mark bot as isBot in game state
+    for (const p of room.gameState.players) {
+      if (isBotId(p.id)) {
+        p.isBot = true;
+      }
+    }
+
+    // Auto-ready the bot in swap phase
+    const botPlayer = room.gameState.players.find(p => p.isBot);
+    if (botPlayer) {
+      botPlayer.ready = true;
+    }
+
+    broadcastGameState(io, room);
+
+    // If bot goes first after swap phase ready, handle it
+    // (player still needs to ready themselves first)
   });
 
   // ── Start Game ──────────────────────────────────────────
@@ -78,6 +127,11 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
 
     room.gameState = result;
     broadcastGameState(io, room);
+
+    // After all ready, check if bot goes first
+    if (room.gameState.phase === 'playing') {
+      scheduleBotTurnIfNeeded(io, room);
+    }
   });
 
   // ── Play Cards ──────────────────────────────────────────
@@ -93,42 +147,16 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
 
     room.gameState = result.state;
 
-    // Send animation hints before full state
     const player = room.gameState.players.find(p => p.id === socket.id);
     const playerName = player?.name ?? 'Unknown';
 
-    if (result.burned) {
-      io.to(room.code).emit('pile-burned', {
-        reason: result.effect ?? 'Burned!',
-        playerId: socket.id,
-        playerName,
-      });
-    }
-
-    if (result.pickedUpInstead) {
-      io.to(room.code).emit('pile-picked-up', {
-        playerId: socket.id,
-        playerName,
-        cardCount: player?.hand.length ?? 0,
-      });
-    }
-
+    emitPlayEffects(io, room, result, socket.id, playerName);
     broadcastGameState(io, room);
+    checkGameOver(io, room);
 
-    // Check game over
-    if (room.gameState.phase === 'game-over') {
-      const loser = room.gameState.players.find(p => p.id === room.gameState!.loserId);
-      const stats: GameEndStats = {
-        players: room.gameState.players.map(p => ({ id: p.id, name: p.name })),
-        loserId: room.gameState.loserId!,
-        loserName: loser?.name ?? 'Unknown',
-        timestamp: Date.now(),
-      };
-      io.to(room.code).emit('game-over', {
-        loserId: room.gameState.loserId!,
-        loserName: loser?.name ?? 'Unknown',
-        stats,
-      });
+    // Schedule bot turn if next player is bot
+    if (room.gameState.phase === 'playing') {
+      scheduleBotTurnIfNeeded(io, room);
     }
   });
 
@@ -153,6 +181,11 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
     });
 
     broadcastGameState(io, room);
+
+    // Schedule bot turn if next player is bot
+    if (room.gameState.phase === 'playing') {
+      scheduleBotTurnIfNeeded(io, room);
+    }
   });
 
   // ── Play Again ──────────────────────────────────────────
@@ -167,6 +200,15 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
     }));
 
     room.gameState = createGame(playerInfos);
+
+    // Re-mark bots and auto-ready them
+    for (const p of room.gameState.players) {
+      if (isBotId(p.id)) {
+        p.isBot = true;
+        p.ready = true;
+      }
+    }
+
     broadcastGameState(io, room);
   });
 
@@ -182,7 +224,126 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
   });
 }
 
-// ── Helpers ──────────────────────────────────────────────────
+// ── Bot Turn Logic ────────────────────────────────────────────
+
+function scheduleBotTurnIfNeeded(io: TypedServer, room: Room): void {
+  if (!room.gameState || room.gameState.phase !== 'playing') return;
+
+  const currentPlayer = room.gameState.players[room.gameState.currentPlayerIndex];
+  if (!currentPlayer || !isBotId(currentPlayer.id)) return;
+
+  // Delay bot move for natural feel
+  setTimeout(() => {
+    processBotTurn(io, room);
+  }, BOT_MOVE_DELAY);
+}
+
+function processBotTurn(io: TypedServer, room: Room): void {
+  if (!room.gameState || room.gameState.phase !== 'playing') return;
+
+  const currentPlayer = room.gameState.players[room.gameState.currentPlayerIndex];
+  if (!currentPlayer || !isBotId(currentPlayer.id)) return;
+
+  const botId = currentPlayer.id;
+  const botName = currentPlayer.name;
+
+  const move = chooseBotMove(room.gameState, botId);
+
+  if (move.action === 'play' && move.cardIds) {
+    const result = playCards(room.gameState, botId, move.cardIds);
+    if ('error' in result) {
+      // Fallback: if play fails, pick up
+      const pickupResult = pickUpPile(room.gameState, botId);
+      if (!('error' in pickupResult)) {
+        room.gameState = pickupResult;
+        io.to(room.code).emit('pile-picked-up', {
+          playerId: botId,
+          playerName: botName,
+          cardCount: currentPlayer.hand.length,
+        });
+      }
+    } else {
+      room.gameState = result.state;
+      emitPlayEffects(io, room, result, botId, botName);
+    }
+  } else {
+    // Pickup
+    const result = pickUpPile(room.gameState, botId);
+    if (!('error' in result)) {
+      room.gameState = result;
+      const botAfter = result.players.find(p => p.id === botId);
+      io.to(room.code).emit('pile-picked-up', {
+        playerId: botId,
+        playerName: botName,
+        cardCount: botAfter?.hand.length ?? 0,
+      });
+    }
+  }
+
+  broadcastGameState(io, room);
+  checkGameOver(io, room);
+
+  // Chain: if bot gets another turn (e.g. after burn/10), schedule again
+  if (room.gameState.phase === 'playing') {
+    scheduleBotTurnIfNeeded(io, room);
+  }
+}
+
+// ── Shared Helpers ────────────────────────────────────────────
+
+function emitPlayEffects(
+  io: TypedServer,
+  room: Room,
+  result: { effect?: string; burned: boolean; pickedUpInstead?: boolean; playedRanks: string[] },
+  playerId: string,
+  playerName: string,
+): void {
+  if (result.burned) {
+    io.to(room.code).emit('pile-burned', {
+      reason: result.effect ?? 'Burned!',
+      playerId,
+      playerName,
+    });
+  }
+
+  // Emit special floating text effects
+  if (result.playedRanks.includes('Q')) {
+    io.to(room.code).emit('special-effect', { effect: 'FOOF', playerName });
+  }
+  if (result.burned) {
+    if (result.effect?.includes('Four of a kind')) {
+      io.to(room.code).emit('special-effect', { effect: 'DESTROYED', playerName });
+    } else if (result.playedRanks.includes('10')) {
+      io.to(room.code).emit('special-effect', { effect: 'MEGATRON', playerName });
+    }
+  }
+
+  if (result.pickedUpInstead) {
+    const player = room.gameState?.players.find(p => p.id === playerId);
+    io.to(room.code).emit('pile-picked-up', {
+      playerId,
+      playerName,
+      cardCount: player?.hand.length ?? 0,
+    });
+  }
+}
+
+function checkGameOver(io: TypedServer, room: Room): void {
+  if (!room.gameState || room.gameState.phase !== 'game-over') return;
+
+  const loser = room.gameState.players.find(p => p.id === room.gameState!.loserId);
+  const stats: GameEndStats = {
+    players: room.gameState.players.map(p => ({ id: p.id, name: p.name })),
+    loserId: room.gameState.loserId!,
+    loserName: loser?.name ?? 'Unknown',
+    timestamp: Date.now(),
+  };
+  io.to(room.code).emit('game-over', {
+    loserId: room.gameState.loserId!,
+    loserName: loser?.name ?? 'Unknown',
+    stats,
+  });
+}
 
 function getRoomInfo(room: Room): RoomInfo {
   return {
@@ -199,6 +360,8 @@ function getRoomInfo(room: Room): RoomInfo {
 function broadcastGameState(io: TypedServer, room: Room): void {
   if (!room.gameState) return;
   for (const [playerId] of room.players) {
+    // Skip emitting to bot players (they don't have real sockets)
+    if (isBotId(playerId)) continue;
     const clientState = getClientState(room.gameState, playerId);
     io.to(playerId).emit('game-state', clientState);
   }
