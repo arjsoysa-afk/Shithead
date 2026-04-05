@@ -12,9 +12,10 @@ interface LobbyProps {
   onPlayVsComputer: (name: string) => void;
   onStartGame: () => void;
   onShowStats: () => void;
+  onPlayMaze: () => void;
 }
 
-export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsComputer, onStartGame, onShowStats }: LobbyProps) {
+export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsComputer, onStartGame, onShowStats, onPlayMaze }: LobbyProps) {
   const [name, setName] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [mode, setMode] = useState<'menu' | 'join'>('menu');
@@ -418,16 +419,28 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
           )}
         </motion.div>
 
-        {/* Stats link */}
-        <button
-          className="mt-6 mx-auto block text-sm transition-colors"
-          style={{ color: 'rgba(191,90,242,0.25)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(191,90,242,0.5)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(191,90,242,0.25)')}
-          onClick={onShowStats}
-        >
-          View Stats
-        </button>
+        {/* Bottom links */}
+        <div className="mt-6 flex items-center justify-center gap-6">
+          <button
+            className="text-sm transition-colors"
+            style={{ color: 'rgba(191,90,242,0.25)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(191,90,242,0.5)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(191,90,242,0.25)')}
+            onClick={onShowStats}
+          >
+            View Stats
+          </button>
+          <span style={{ color: 'rgba(191,90,242,0.15)' }}>|</span>
+          <button
+            className="text-sm transition-colors"
+            style={{ color: 'rgba(34,197,94,0.4)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(34,197,94,0.7)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(34,197,94,0.4)')}
+            onClick={onPlayMaze}
+          >
+            Jungle Maze Runner
+          </button>
+        </div>
       </motion.div>
     </div>
   );

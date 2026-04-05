@@ -12,6 +12,7 @@ import { ToastContainer } from './components/Toast';
 import { KeyboardHelp } from './components/KeyboardHelp';
 import { FloatingEffect } from './components/FloatingEffect';
 import { CyberpunkBg } from './components/CyberpunkBg';
+import { JungleMazeRunner } from './components/JungleMazeRunner';
 import type { GameEndStats, PlayerStats } from '../../shared/types';
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
   } = useGameState();
 
   const [showStats, setShowStats] = useState(false);
+  const [showMazeGame, setShowMazeGame] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [endGameStats, setEndGameStats] = useState<PlayerStats | null>(null);
 
@@ -73,6 +75,11 @@ export default function App() {
     selectAllSameRank,
     clearSelection,
   });
+
+  // Jungle Maze Runner game
+  if (showMazeGame) {
+    return <JungleMazeRunner onExit={() => setShowMazeGame(false)} />;
+  }
 
   // Stats view
   if (showStats) {
@@ -154,6 +161,7 @@ export default function App() {
         onPlayVsComputer={playVsComputer}
         onStartGame={startGame}
         onShowStats={() => setShowStats(true)}
+        onPlayMaze={() => setShowMazeGame(true)}
       />
       <ToastContainer toasts={toasts} />
     </>
