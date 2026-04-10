@@ -85,13 +85,23 @@ export function isValidPlay(
     return { valid: true };
   }
 
-  // Get the cards from the correct source
-  const cards = source === 'hand' ? player.hand : player.faceUp;
+  // Get the cards — when playing from hand, also allow face-up cards of the same rank
+  // (cross-source play: e.g. King in hand + King in face-up, all played together)
+  const primaryPool = source === 'hand' ? player.hand : player.faceUp;
+  const crossPool = source === 'hand' ? player.faceUp : [];
   const selectedCards: Card[] = [];
   for (const id of cardIds) {
-    const card = cards.find(c => c.id === id);
+    const card = primaryPool.find(c => c.id === id) ?? crossPool.find(c => c.id === id);
     if (!card) return { valid: false, reason: `Card ${id} not found in your ${source}` };
     selectedCards.push(card);
+  }
+
+  // If cross-source: at least one card must come from the primary source (hand)
+  if (source === 'hand' && crossPool.length > 0) {
+    const hasHandCard = selectedCards.some(c => player.hand.some(h => h.id === c.id));
+    if (!hasHandCard) {
+      return { valid: false, reason: 'You must play at least one card from your hand' };
+    }
   }
 
   // All cards must be the same rank

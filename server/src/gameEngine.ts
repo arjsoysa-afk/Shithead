@@ -190,12 +190,17 @@ export function playCards(
     return { state: checkGameOver(newState), effect: result.effect, burned: result.burned, playedRanks: [card.rank] };
   }
 
-  // ── Normal play (hand or face-up) ─────────────────────
+  // ── Normal play (hand or face-up, or cross-source same rank) ─────────────────────
   const cards: Card[] = [];
   for (const id of cardIds) {
-    const arr = source === 'hand' ? newPlayer.hand : newPlayer.faceUp;
-    const idx = arr.findIndex(c => c.id === id);
-    cards.push(arr.splice(idx, 1)[0]);
+    // Search hand first, then face-up (supports cross-source plays)
+    let idx = newPlayer.hand.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      cards.push(newPlayer.hand.splice(idx, 1)[0]);
+    } else {
+      idx = newPlayer.faceUp.findIndex(c => c.id === id);
+      if (idx !== -1) cards.push(newPlayer.faceUp.splice(idx, 1)[0]);
+    }
   }
 
   // Red 6s never go into the pile — they are always burnt

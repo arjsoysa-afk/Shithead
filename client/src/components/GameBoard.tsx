@@ -263,13 +263,20 @@ export function GameBoard({
           const isPlayingFaceUp = !hasHand && hasFaceUp;
           const isPlayingFaceDown = !hasHand && !hasFaceUp && hasFaceDown;
 
+          // Rank of the hand cards already selected (enables cross-source same-rank play)
+          const handSelectedRank = selectedCardIds.size > 0
+            ? you.hand.find(c => selectedCardIds.has(c.id))?.rank ?? null
+            : null;
+
           const faceDownRow = (hasFaceDown || hasFaceUp) && (
             <div className="flex justify-center items-center mt-1">
               <div className="flex gap-2">
                 {Array.from({ length: Math.max(you.faceDownCount, you.faceUp.length) }).map((_, i) => {
                   const hasFD = i < you.faceDownCount;
                   const faceUpCard = you.faceUp[i];
-                  const isFaceUpPlayable = isPlayingFaceUp && faceUpCard;
+                  // Face-up playable normally (no hand), OR cross-source: rank matches selected hand card
+                  const isCrossSourcePlay = hasHand && isYourTurn && faceUpCard != null && handSelectedRank === faceUpCard.rank;
+                  const isFaceUpPlayable = (isPlayingFaceUp && faceUpCard) || isCrossSourcePlay;
                   const isFaceDownPlayable = isPlayingFaceDown && hasFD;
 
                   return (
