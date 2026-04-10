@@ -250,17 +250,23 @@ export function pickUpPile(state: GameState, playerId: string): GameState | { er
   let newState = deepClone(state);
   const player = newState.players[playerIndex];
 
+  const wasForced = newState.mustPickUp; // red 6 forced pickup
+
   player.hand = [...player.hand, ...newState.pile];
   newState.pile = [];
   newState.mustPlayLower = false;
   newState.mustPickUp = false;
   sortHand(player.hand);
-  newState.lastAction = `${player.name} picked up ${player.hand.length} cards`;
+  newState.lastAction = `${player.name} picked up${wasForced ? ' (red 6 — still your turn!)' : ''}`;
 
   // Remove from finished if they were somehow there
   newState.finishedPlayerIds = newState.finishedPlayerIds.filter(id => id !== playerId);
 
-  newState = advanceTurn(newState);
+  // If forced by a red 6, the pickup doesn't count as a turn — player plays again
+  if (!wasForced) {
+    newState = advanceTurn(newState);
+  }
+
   return newState;
 }
 
