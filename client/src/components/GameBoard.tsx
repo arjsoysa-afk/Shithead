@@ -239,87 +239,87 @@ export function GameBoard({
         )}
       </div>
 
-      {/* Player area (bottom) — sits below deck/pile, never overlaps */}
-      <div className="absolute bottom-0 left-0 right-0 pb-2 px-4 flex flex-col items-center" style={{ maxHeight: '50vh' }}>
-        {/* Hand (on top) */}
-        {hasHand && (
-          <motion.div
-            className="w-full"
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-          >
-            <Hand
-              cards={you.hand}
-              selectedIds={selectedCardIds}
-              onToggleCard={onToggleCard}
-              disabled={!isYourTurn}
-            />
-          </motion.div>
-        )}
+      {/* Player area — fixed to bottom, cards scroll, buttons always pinned */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 flex flex-col" style={{ maxHeight: '50vh' }}>
 
-        {/* Table cards */}
-        {(() => {
-          const isPlayingFaceUp = !hasHand && hasFaceUp;
-          const isPlayingFaceDown = !hasHand && !hasFaceUp && hasFaceDown;
+        {/* Cards — scrollable area above the buttons */}
+        <div className="flex-1 overflow-y-auto min-h-0 px-4 pt-2 flex flex-col items-center gap-1">
+          {/* Hand */}
+          {hasHand && (
+            <motion.div
+              className="w-full"
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+            >
+              <Hand
+                cards={you.hand}
+                selectedIds={selectedCardIds}
+                onToggleCard={onToggleCard}
+                disabled={!isYourTurn}
+              />
+            </motion.div>
+          )}
 
-          // Rank of the hand cards already selected (enables cross-source same-rank play)
-          const handSelectedRank = selectedCardIds.size > 0
-            ? you.hand.find(c => selectedCardIds.has(c.id))?.rank ?? null
-            : null;
+          {/* Table cards (face-down + face-up stacked) */}
+          {(() => {
+            const isPlayingFaceUp = !hasHand && hasFaceUp;
+            const isPlayingFaceDown = !hasHand && !hasFaceUp && hasFaceDown;
 
-          const faceDownRow = (hasFaceDown || hasFaceUp) && (
-            <div className="flex justify-center items-center mt-1">
-              <div className="flex gap-2">
-                {Array.from({ length: Math.max(you.faceDownCount, you.faceUp.length) }).map((_, i) => {
-                  const hasFD = i < you.faceDownCount;
-                  const faceUpCard = you.faceUp[i];
-                  // Face-up playable normally (no hand), OR cross-source: rank matches selected hand card
-                  const isCrossSourcePlay = hasHand && isYourTurn && faceUpCard != null && handSelectedRank === faceUpCard.rank;
-                  const isFaceUpPlayable = (isPlayingFaceUp && faceUpCard) || isCrossSourcePlay;
-                  const isFaceDownPlayable = isPlayingFaceDown && hasFD;
+            const handSelectedRank = selectedCardIds.size > 0
+              ? you.hand.find(c => selectedCardIds.has(c.id))?.rank ?? null
+              : null;
 
-                  return (
-                    <div key={i} className="relative" style={{ width: 48, height: hasFD && faceUpCard ? 82 : 64 }}>
-                      {hasFD && (
-                        <div className="absolute top-0 left-0" style={{ zIndex: 1 }}>
-                          <Card
-                            small
-                            index={i}
-                            onClick={isFaceDownPlayable && isYourTurn ? () => onPlayFaceDown(you.faceDownIds[i]) : undefined}
-                          />
-                        </div>
-                      )}
-                      {faceUpCard && (
-                        <div className="absolute left-0" style={{ top: hasFD ? 16 : 0, zIndex: 2 }}>
-                          <Card
-                            card={faceUpCard}
-                            small
-                            disabled={!isFaceUpPlayable || !isYourTurn}
-                            selected={isFaceUpPlayable ? selectedCardIds?.has(faceUpCard.id) : false}
-                            onClick={isFaceUpPlayable && isYourTurn ? () => onToggleCard(faceUpCard.id, faceUpCard) : undefined}
-                            index={i}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+            if (!hasFaceDown && !hasFaceUp) return null;
+
+            return (
+              <div className="flex justify-center items-center">
+                <div className="flex gap-2">
+                  {Array.from({ length: Math.max(you.faceDownCount, you.faceUp.length) }).map((_, i) => {
+                    const hasFD = i < you.faceDownCount;
+                    const faceUpCard = you.faceUp[i];
+                    const isCrossSourcePlay = hasHand && isYourTurn && faceUpCard != null && handSelectedRank === faceUpCard.rank;
+                    const isFaceUpPlayable = (isPlayingFaceUp && faceUpCard) || isCrossSourcePlay;
+                    const isFaceDownPlayable = isPlayingFaceDown && hasFD;
+
+                    return (
+                      <div key={i} className="relative" style={{ width: 48, height: hasFD && faceUpCard ? 82 : 64 }}>
+                        {hasFD && (
+                          <div className="absolute top-0 left-0" style={{ zIndex: 1 }}>
+                            <Card
+                              small
+                              index={i}
+                              onClick={isFaceDownPlayable && isYourTurn ? () => onPlayFaceDown(you.faceDownIds[i]) : undefined}
+                            />
+                          </div>
+                        )}
+                        {faceUpCard && (
+                          <div className="absolute left-0" style={{ top: hasFD ? 16 : 0, zIndex: 2 }}>
+                            <Card
+                              card={faceUpCard}
+                              small
+                              disabled={!isFaceUpPlayable || !isYourTurn}
+                              selected={isFaceUpPlayable ? selectedCardIds?.has(faceUpCard.id) : false}
+                              onClick={isFaceUpPlayable && isYourTurn ? () => onToggleCard(faceUpCard.id, faceUpCard) : undefined}
+                              index={i}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
+            );
+          })()}
+        </div>
 
-          // If no table cards at all (all gone), nothing to show here
-          if (!hasFaceDown && !hasFaceUp) {
-            return null;
-          }
-
-          return faceDownRow;
-        })()}
-
-        {/* Action buttons */}
+        {/* Action buttons — always visible, pinned to bottom of panel */}
         {isYourTurn && !isFinished && (
-          <div className="flex justify-center gap-3 mt-4">
+          <div
+            className="flex-shrink-0 flex justify-center gap-3 px-4 py-3"
+            style={{ background: 'linear-gradient(to bottom, transparent, #08080d 40%)' }}
+          >
             {selectedCardIds.size > 0 && (
               <motion.button
                 className="px-6 py-2.5 rounded-xl bg-accent text-white font-semibold text-sm
@@ -347,7 +347,7 @@ export function GameBoard({
       </div>
 
       {/* Keyboard hint */}
-      <div className="absolute bottom-2 right-4 text-text-muted text-[11px]">
+      <div className="fixed bottom-2 right-4 z-10 text-text-muted text-[11px] pointer-events-none">
         Press <kbd className="px-1 py-0.5 rounded border border-border text-[10px]">?</kbd> for shortcuts
       </div>
     </div>
