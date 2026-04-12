@@ -3,7 +3,7 @@ import {
   ServerToClientEvents, ClientToServerEvents, RoomInfo, GameEndStats,
 } from '../../shared/types';
 import {
-  createRoom, joinRoom, leaveRoom, findRoomByPlayer, Room,
+  createRoom, joinRoom, leaveRoom, rejoinRoom, findRoomByPlayer, Room,
 } from './roomManager';
 import {
   createGame, swapCards, confirmReady, playCards, pickUpPile, getClientState,
@@ -210,6 +210,21 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
     }
 
     broadcastGameState(io, room);
+  });
+
+  // ── Rejoin Room (after screen lock / reconnect) ─────────
+  socket.on('rejoin-room', ({ roomCode, playerName }) => {
+    const result = rejoinRoom(roomCode, playerName, socket.id);
+    if ('error' in result) {
+      socket.emit('error', { message: result.error });
+      return;
+    }
+    socket.join(result.code);
+    socket.emit('room-joined', getRoomInfo(result));
+    io.to(result.code).emit('player-joined', getRoomInfo(result));
+    if (result.gameState) {
+      broadcastGameState(io, result);
+    }
   });
 
   // ── Disconnect ──────────────────────────────────────────

@@ -10,6 +10,10 @@ export interface Room {
 
 const rooms = new Map<string, Room>();
 
+// Grace period (ms) before removing a disconnected player during an active game
+const DISCONNECT_GRACE_MS = 90_000;
+const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 function generateCode(): string {
@@ -56,29 +60,89 @@ export function leaveRoom(playerId: string): { room: Room; wasHost: boolean } | 
   for (const [, room] of rooms) {
     if (room.players.has(playerId)) {
       const wasHost = room.hostId === playerId;
-      room.players.delete(playerId);
       room.lastActivity = Date.now();
 
-      // If game is in progress, mark as disconnected instead of removing
-      if (room.gameState && room.gameState.phase === 'playing') {
+      // During an active game, keep the slot for 90s to allow reconnection
+      if (room.gameState && (room.gameState.phase === 'swapping' || room.gameState.phase === 'playing')) {
+        const playerInfo = room.players.get(playerId)!;
+        playerInfo.connected = false;
         const player = room.gameState.players.find(p => p.id === playerId);
         if (player) player.connected = false;
+
+        // Schedule actual removal after grace period
+        const timer = setTimeout(() => {
+          disconnectTimers.delete(playerId);
+          for (const [code, r] of rooms) {
+            if (r.players.has(playerId)) {
+              r.players.delete(playerId);
+              if (r.players.size === 0) rooms.delete(code);
+              break;
+            }
+          }
+        }, DISCONNECT_GRACE_MS);
+        disconnectTimers.set(playerId, timer);
+
+        return { room, wasHost };
       }
 
-      // Transfer host if needed
+      // Outside of game — remove immediately
+      room.players.delete(playerId);
       if (wasHost && room.players.size > 0) {
         room.hostId = room.players.keys().next().value!;
       }
-
-      // Clean up empty rooms
       if (room.players.size === 0) {
         rooms.delete(room.code);
       }
-
       return { room, wasHost };
     }
   }
   return null;
+}
+
+export function rejoinRoom(
+  roomCode: string,
+  playerName: string,
+  newSocketId: string,
+): Room | { error: string } {
+  const room = rooms.get(roomCode.toUpperCase());
+  if (!room) return { error: 'Room not found — it may have expired' };
+
+  // Find a disconnected player slot with this name
+  let oldSocketId: string | null = null;
+  for (const [id, info] of room.players) {
+    if (info.name === playerName && !info.connected) {
+      oldSocketId = id;
+      break;
+    }
+  }
+  if (!oldSocketId) return { error: 'No disconnected player found — try rejoining manually' };
+
+  // Cancel the grace-period removal timer
+  const timer = disconnectTimers.get(oldSocketId);
+  if (timer) { clearTimeout(timer); disconnectTimers.delete(oldSocketId); }
+
+  // Remap socket ID in the players map
+  const playerInfo = room.players.get(oldSocketId)!;
+  playerInfo.connected = true;
+  room.players.delete(oldSocketId);
+  room.players.set(newSocketId, playerInfo);
+
+  // Update host if needed
+  if (room.hostId === oldSocketId) room.hostId = newSocketId;
+
+  // Update game state player ID and any ID references
+  if (room.gameState) {
+    const gp = room.gameState.players.find(p => p.id === oldSocketId);
+    if (gp) { gp.id = newSocketId; gp.connected = true; }
+
+    const finIdx = room.gameState.finishedPlayerIds.indexOf(oldSocketId);
+    if (finIdx !== -1) room.gameState.finishedPlayerIds[finIdx] = newSocketId;
+    if (room.gameState.winnerId === oldSocketId) room.gameState.winnerId = newSocketId;
+    if (room.gameState.loserId === oldSocketId) room.gameState.loserId = newSocketId;
+  }
+
+  room.lastActivity = Date.now();
+  return room;
 }
 
 export function findRoomByPlayer(playerId: string): Room | null {

@@ -129,6 +129,7 @@ export interface ClientToServerEvents {
   'pick-up-pile': () => void;
   'play-again': () => void;
   'play-vs-computer': (data: { playerName: string }) => void;
+  'rejoin-room': (data: { roomCode: string; playerName: string }) => void;
 }
 
 // ── Stats Types ─────────────────────────────────────────────

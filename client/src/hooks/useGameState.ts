@@ -17,6 +17,18 @@ export function useGameState() {
   const [specialEffects, setSpecialEffects] = useState<SpecialEffect[]>([]);
   const effectTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
+  // Auto-rejoin after reconnect (screen lock / network blip)
+  useEffect(() => {
+    const handleReconnect = () => {
+      const saved = sessionStorage.getItem('shithead-session');
+      if (!saved) return;
+      const { roomCode, playerName } = JSON.parse(saved);
+      socket.emit('rejoin-room', { roomCode, playerName });
+    };
+    socket.io.on('reconnect', handleReconnect);
+    return () => { socket.io.off('reconnect', handleReconnect); };
+  }, []);
+
   useEffect(() => {
     socket.on('game-state', (state) => {
       setGameState(state);
@@ -30,6 +42,12 @@ export function useGameState() {
 
     socket.on('room-joined', (info) => {
       setRoomInfo(info);
+      // Update saved session with confirmed room code
+      const saved = sessionStorage.getItem('shithead-session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        sessionStorage.setItem('shithead-session', JSON.stringify({ ...parsed, roomCode: info.code }));
+      }
     });
 
     socket.on('player-joined', (info) => {
@@ -101,14 +119,18 @@ export function useGameState() {
   // ── Actions ─────────────────────────────────────────────
   const createRoom = useCallback((playerName: string) => {
     socket.emit('create-room', { playerName });
+    // Room code isn't known yet — saved when room-joined fires (see below)
+    sessionStorage.setItem('shithead-session', JSON.stringify({ playerName, roomCode: '' }));
   }, []);
 
   const joinRoom = useCallback((roomCode: string, playerName: string) => {
     socket.emit('join-room', { roomCode, playerName });
+    sessionStorage.setItem('shithead-session', JSON.stringify({ playerName, roomCode }));
   }, []);
 
   const playVsComputer = useCallback((playerName: string) => {
     socket.emit('play-vs-computer', { playerName });
+    sessionStorage.setItem('shithead-session', JSON.stringify({ playerName, roomCode: '' }));
   }, []);
 
   const startGame = useCallback(() => {
@@ -178,6 +200,7 @@ export function useGameState() {
   }, []);
 
   const leaveGame = useCallback(() => {
+    sessionStorage.removeItem('shithead-session');
     setGameState(null);
     setRoomInfo(null);
     setSelectedCardIds(new Set());
