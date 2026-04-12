@@ -22,6 +22,7 @@ export default function App() {
     toasts,
     specialEffects,
     selectedCardIds,
+    emojiReactions,
     createRoom,
     joinRoom,
     playVsComputer,
@@ -36,6 +37,7 @@ export default function App() {
     selectAllSameRank,
     clearSelection,
     leaveGame,
+    sendEmojiReaction,
   } = useGameState();
 
   const [showStats, setShowStats] = useState(false);
@@ -133,6 +135,9 @@ export default function App() {
             onPickUp={pickUpPile}
             onPlayFaceDown={playFaceDown}
             loadStats={loadStats}
+            onSendEmoji={sendEmojiReaction}
+            emojiReactions={emojiReactions}
+            roomCode={roomInfo?.code}
           />
           <FloatingEffect effects={specialEffects} />
           <ToastContainer toasts={toasts} />

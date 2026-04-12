@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import type { Card as CardType, Suit } from '../../../shared/types';
 
@@ -16,9 +17,42 @@ interface CardProps {
   small?: boolean;
   onClick?: () => void;
   index?: number;        // for stagger animations
+  isPlayable?: boolean;
+  shake?: boolean;
+  onLongPress?: () => void;
 }
 
-export function Card({ card, selected, disabled, small, onClick, index = 0 }: CardProps) {
+export function Card({ card, selected, disabled, small, onClick, index = 0, isPlayable, shake, onLongPress }: CardProps) {
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+
+  const handleTouchStart = () => {
+    if (!onLongPress) return;
+    longPressFired.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      onLongPress();
+    }, 500);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleTouchMove = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleClick = () => {
+    if (longPressFired.current) return;
+    onClick?.();
+  };
   const w = small ? 'w-[52px]' : 'w-[88px]';
   const h = small ? 'h-[74px]' : 'h-[124px]';
   const r = small ? 'rounded-lg' : 'rounded-xl';
@@ -42,12 +76,15 @@ export function Card({ card, selected, disabled, small, onClick, index = 0 }: Ca
           border: '1px solid rgba(191,90,242,0.2)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.6), inset 0 0 20px rgba(191,90,242,0.03)',
         }}
-        onClick={onClick}
+        onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
         whileHover={onClick ? { y: -4, scale: 1.03 } : undefined}
         whileTap={onClick ? { scale: 0.97 } : undefined}
         initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: index * 0.05 }}
+        animate={shake ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : { opacity: 1, scale: 1 }}
+        transition={shake ? { duration: 0.4 } : { delay: index * 0.05 }}
       >
         {/* Sacred geometry SVG */}
         <svg
@@ -229,6 +266,8 @@ export function Card({ card, selected, disabled, small, onClick, index = 0 }: Ca
   const suitSize = small ? 'text-xl' : 'text-[38px]';
   const cornerSuit = small ? 'text-[8px]' : 'text-[13px]';
 
+  const showPlayableGlow = isPlayable && !disabled && !selected;
+
   return (
     <motion.div
       className={`${w} ${h} ${r} relative cursor-pointer flex-shrink-0 overflow-hidden
@@ -238,24 +277,35 @@ export function Card({ card, selected, disabled, small, onClick, index = 0 }: Ca
         background: 'linear-gradient(160deg, #ffffff 0%, #f8f8fa 50%, #f0f0f4 100%)',
         border: selected
           ? '2px solid #bf5af2'
+          : showPlayableGlow
+          ? '1px solid rgba(0,255,135,0.4)'
           : '1px solid rgba(0,0,0,0.08)',
         boxShadow: selected
           ? '0 0 24px rgba(191,90,242,0.4), 0 4px 16px rgba(0,0,0,0.15)'
           : '0 2px 8px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)',
       }}
-      onClick={disabled ? undefined : onClick}
-      animate={{
-        y: selected ? (small ? -8 : -20) : 0,
-        opacity: 1,
-      }}
-      whileHover={!disabled && !selected ? { y: small ? -4 : -12, transition: { duration: 0.15 } } : undefined}
+      onClick={disabled ? undefined : handleClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
+      animate={shake
+        ? { x: [0, -8, 8, -6, 6, -3, 3, 0] }
+        : { y: selected ? (small ? -8 : -20) : 0, opacity: 1 }
+      }
+      whileHover={!disabled && !selected
+        ? {
+            y: small ? -4 : -12,
+            ...(showPlayableGlow ? { boxShadow: '0 0 16px rgba(0,255,135,0.5)' } : {}),
+            transition: { duration: 0.15 },
+          }
+        : undefined
+      }
       whileTap={!disabled ? { scale: 0.97 } : undefined}
       initial={{ opacity: 0, y: 20 }}
-      transition={{
-        type: 'spring',
-        stiffness: 400,
-        damping: 25,
-      }}
+      transition={shake
+        ? { duration: 0.4 }
+        : { type: 'spring', stiffness: 400, damping: 25 }
+      }
       layout
     >
       {/* Top-left rank + suit */}

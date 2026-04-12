@@ -227,6 +227,16 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
     }
   });
 
+  // ── Emoji Reaction ──────────────────────────────────────
+  socket.on('emoji-reaction', ({ emoji }) => {
+    const room = findRoomByPlayer(socket.id);
+    if (!room) return;
+    const player = room.gameState?.players.find(p => p.id === socket.id)
+      ?? Array.from(room.players.entries()).find(([id]) => id === socket.id)?.[1];
+    const playerName = (player as any)?.name ?? 'Unknown';
+    io.to(room.code).emit('emoji-reaction', { playerId: socket.id, playerName, emoji });
+  });
+
   // ── Disconnect ──────────────────────────────────────────
   socket.on('disconnect', () => {
     const result = leaveRoom(socket.id);

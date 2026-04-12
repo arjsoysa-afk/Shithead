@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { Hand } from './Hand';
 import { Card } from './Card';
@@ -5,7 +6,12 @@ import { Pile } from './Pile';
 import { DrawPile } from './DrawPile';
 import { OpponentRow } from './OpponentRow';
 import { PlayerAvatar } from './Avatar';
+import { EmojiReaction } from './EmojiReaction';
+import { ParticleBurst } from './ParticleBurst';
+import { socket } from '../socket';
+import { playCardSound, playBurnSound, playPickupSound, playSpecialSound, toggleMute, muted } from '../hooks/useSound';
 import type { ClientGameState, Card as CardType, PlayerStats } from '../../../shared/types';
+import type { FloatingEmoji } from './EmojiReaction';
 
 const CYBER_COLORS = ['#bf5af2','#00f0ff','#ff6bcb','#00ff87','#ffd60a','#7b61ff'];
 
@@ -17,6 +23,9 @@ interface GameBoardProps {
   onPickUp: () => void;
   onPlayFaceDown: (cardId: string) => void;
   loadStats: () => PlayerStats;
+  onSendEmoji: (emoji: string) => void;
+  emojiReactions: FloatingEmoji[];
+  roomCode?: string;
 }
 
 export function GameBoard({
@@ -27,6 +36,9 @@ export function GameBoard({
   onPickUp,
   onPlayFaceDown,
   loadStats,
+  onSendEmoji,
+  emojiReactions,
+  roomCode,
 }: GameBoardProps) {
   const { you, opponents, pileTop, pileCount, drawPileCount, isYourTurn, mustPickUp, mustPlayLower, direction, lastAction, currentPlayerId } = gameState;
 
@@ -43,17 +55,112 @@ export function GameBoard({
   // Position opponents around the table
   const opponentPositions = getOpponentPositions(opponents.length);
 
+  // Screen shake on burn
+  const [shaking, setShaking] = useState(false);
+
+  // Particle burst on burn
+  const [burstActive, setBurstActive] = useState(false);
+
+  // Mute state
+  const [isMuted, setIsMuted] = useState(muted);
+
+  // Session stats
+  const sessionBurns = useRef(0);
+  const sessionPickups = useRef(0);
+  const [sessionStats, setSessionStats] = useState({ burns: 0, pickups: 0 });
+
+  useEffect(() => {
+    const onPileBurned = () => {
+      setShaking(true);
+      setTimeout(() => setShaking(false), 500);
+      setBurstActive(true);
+      playBurnSound();
+      sessionBurns.current += 1;
+      setSessionStats({ burns: sessionBurns.current, pickups: sessionPickups.current });
+    };
+
+    const onPilePickedUp = () => {
+      playPickupSound();
+      sessionPickups.current += 1;
+      setSessionStats({ burns: sessionBurns.current, pickups: sessionPickups.current });
+    };
+
+    const onSpecialEffect = () => {
+      playSpecialSound();
+    };
+
+    socket.on('pile-burned', onPileBurned);
+    socket.on('pile-picked-up', onPilePickedUp);
+    socket.on('special-effect', onSpecialEffect);
+
+    return () => {
+      socket.off('pile-burned', onPileBurned);
+      socket.off('pile-picked-up', onPilePickedUp);
+      socket.off('special-effect', onSpecialEffect);
+    };
+  }, []);
+
+  const handlePlayCards = () => {
+    playCardSound();
+    onPlayCards();
+  };
+
+  const handlePickUp = () => {
+    playPickupSound();
+    onPickUp();
+  };
+
+  const handleMuteToggle = () => {
+    const next = toggleMute();
+    setIsMuted(next);
+  };
+
   return (
-    <div className="h-screen w-screen relative overflow-hidden">
+    <motion.div
+      animate={shaking ? { x: [-4, 4, -3, 3, -2, 2, 0] } : { x: 0 }}
+      transition={{ duration: 0.4 }}
+      className="h-screen w-screen relative overflow-hidden"
+    >
+      {/* Red border pulse when mustPickUp */}
+      {mustPickUp && (
+        <motion.div
+          className="fixed inset-0 pointer-events-none z-40"
+          animate={{ opacity: [0.3, 0.7, 0.3] }}
+          transition={{ duration: 1, repeat: Infinity }}
+          style={{ border: '3px solid #ff3333', boxShadow: 'inset 0 0 40px rgba(255,51,51,0.3), 0 0 40px rgba(255,51,51,0.2)' }}
+        />
+      )}
+
+      {/* Room code badge — top center */}
+      {roomCode && (
+        <div
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-lg text-xs"
+          style={{
+            background: 'rgba(10,10,24,0.7)',
+            border: '1px solid rgba(191,90,242,0.2)',
+            color: 'rgba(191,90,242,0.6)',
+            fontFamily: "'CyberSlash', sans-serif",
+            letterSpacing: '0.15em',
+          }}
+        >
+          {roomCode}
+        </div>
+      )}
+
+      {/* Session stats ticker — below room code */}
+      <div
+        className="fixed top-10 left-1/2 -translate-x-1/2 z-25 flex gap-3"
+        style={{ fontSize: '10px', color: 'rgba(191,90,242,0.4)', fontFamily: "'CyberSlash', sans-serif" }}
+      >
+        <span>🔥 {sessionStats.burns}</span>
+        <span>📦 {sessionStats.pickups}</span>
+      </div>
 
       {/* Head-to-head scoreboard — top right */}
       {(() => {
         const stats = loadStats();
         const h2h = stats.headToHead;
         const opponentNames = opponents.map(o => o.name);
-        const entries = opponentNames
-          .map(name => ({ name, record: h2h[name] }))
-          .filter(e => e.record);
 
         return (
           <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-1.5"
@@ -122,6 +229,17 @@ export function GameBoard({
         })}
       </div>
 
+      {/* Mute toggle — bottom left, above player name */}
+      <button
+        onClick={handleMuteToggle}
+        className="fixed bottom-16 left-4 z-30 w-9 h-9 rounded-lg flex items-center justify-center
+          hover:scale-110 active:scale-95 transition-transform text-lg"
+        style={{ background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+        aria-label={isMuted ? 'Unmute' : 'Mute'}
+      >
+        {isMuted ? '🔇' : '🔊'}
+      </button>
+
       {/* Your name — fixed bottom-left */}
       {(() => {
         const myColor = CYBER_COLORS[myAvatarIndex % CYBER_COLORS.length];
@@ -142,6 +260,21 @@ export function GameBoard({
           </div>
         );
       })()}
+
+      {/* Emoji reaction buttons — left side, vertically centered */}
+      <div className="fixed left-0 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2 p-2">
+        {['👍', '😂', '💀', '🔥', '😤'].map(emoji => (
+          <button
+            key={emoji}
+            onClick={() => onSendEmoji(emoji)}
+            className="w-9 h-9 rounded-lg text-lg flex items-center justify-center
+              hover:scale-110 active:scale-95 transition-transform"
+            style={{ background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
 
       {/* Direction indicator */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
@@ -300,6 +433,7 @@ export function GameBoard({
                               small
                               disabled={!isFaceUpPlayable || !isYourTurn}
                               selected={isFaceUpPlayable ? selectedCardIds?.has(faceUpCard.id) : false}
+                              isPlayable={!!isFaceUpPlayable && isYourTurn}
                               onClick={isFaceUpPlayable && isYourTurn ? () => onToggleCard(faceUpCard.id, faceUpCard) : undefined}
                               index={i}
                             />
@@ -324,7 +458,7 @@ export function GameBoard({
               <motion.button
                 className="px-6 py-2.5 rounded-xl bg-accent text-white font-semibold text-sm
                   hover:shadow-[0_4px_24px_rgba(108,92,231,0.3)] transition-all"
-                onClick={onPlayCards}
+                onClick={handlePlayCards}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 whileTap={{ scale: 0.95 }}
@@ -337,7 +471,7 @@ export function GameBoard({
                 className="px-6 py-2.5 rounded-xl bg-transparent border border-border
                   text-text-secondary text-sm font-medium hover:border-border-hover
                   hover:bg-white/[0.02] transition-all"
-                onClick={onPickUp}
+                onClick={handlePickUp}
               >
                 Pick Up ({pileCount})
               </button>
@@ -350,11 +484,17 @@ export function GameBoard({
       <div className="fixed bottom-2 right-4 z-10 text-text-muted text-[11px] pointer-events-none">
         Press <kbd className="px-1 py-0.5 rounded border border-border text-[10px]">?</kbd> for shortcuts
       </div>
-    </div>
+
+      {/* Emoji reactions overlay */}
+      <EmojiReaction reactions={emojiReactions} />
+
+      {/* Particle burst on pile burn */}
+      <ParticleBurst active={burstActive} onDone={() => setBurstActive(false)} />
+    </motion.div>
   );
 }
 
-function getOpponentPositions(count: number): React.CSSProperties[] {
+function getOpponentPositions(count: number): CSSProperties[] {
   switch (count) {
     case 1:
       return [{ top: '24px', left: '50%', transform: 'translateX(-50%)' }];

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { socket } from '../socket';
 import type { ClientGameState, RoomInfo, Card } from '../../../shared/types';
 import type { SpecialEffect } from '../components/FloatingEffect';
+import type { FloatingEmoji } from '../components/EmojiReaction';
 
 interface Toast {
   id: string;
@@ -15,7 +16,9 @@ export function useGameState() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
   const [specialEffects, setSpecialEffects] = useState<SpecialEffect[]>([]);
+  const [emojiReactions, setEmojiReactions] = useState<FloatingEmoji[]>([]);
   const effectTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const emojiTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Auto-rejoin after reconnect (screen lock / network blip)
   useEffect(() => {
@@ -87,6 +90,19 @@ export function useGameState() {
       effectTimers.current.set(id, timer);
     });
 
+    socket.on('emoji-reaction', ({ playerId, playerName, emoji }) => {
+      const id = `emoji-${Date.now()}-${Math.random()}`;
+      // Randomise horizontal position between 20% and 80% of screen width
+      const x = 20 + Math.random() * 60;
+      setEmojiReactions(prev => [...prev, { id, emoji, playerName, x }]);
+      // Auto-remove after 3 seconds
+      const timer = setTimeout(() => {
+        setEmojiReactions(prev => prev.filter(r => r.id !== id));
+        emojiTimers.current.delete(id);
+      }, 3000);
+      emojiTimers.current.set(id, timer);
+    });
+
     return () => {
       socket.off('game-state');
       socket.off('room-created');
@@ -98,8 +114,10 @@ export function useGameState() {
       socket.off('invalid-move');
       socket.off('error');
       socket.off('special-effect');
+      socket.off('emoji-reaction');
       // Clean up timers
       effectTimers.current.forEach(t => clearTimeout(t));
+      emojiTimers.current.forEach(t => clearTimeout(t));
     };
   }, []);
 
@@ -208,11 +226,16 @@ export function useGameState() {
     socket.connect();
   }, []);
 
+  const sendEmojiReaction = useCallback((emoji: string) => {
+    socket.emit('emoji-reaction', { emoji });
+  }, []);
+
   return {
     gameState,
     roomInfo,
     toasts,
     specialEffects,
+    emojiReactions,
     selectedCardIds,
     createRoom,
     joinRoom,
@@ -228,5 +251,6 @@ export function useGameState() {
     selectAllSameRank,
     clearSelection,
     leaveGame,
+    sendEmojiReaction,
   };
 }

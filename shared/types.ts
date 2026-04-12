@@ -117,6 +117,7 @@ export interface ServerToClientEvents {
   'invalid-move': (data: { reason: string }) => void;
   'game-over': (data: { loserId: string; loserName: string; stats: GameEndStats }) => void;
   'error': (data: { message: string }) => void;
+  'emoji-reaction': (data: { playerId: string; playerName: string; emoji: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -130,6 +131,7 @@ export interface ClientToServerEvents {
   'play-again': () => void;
   'play-vs-computer': (data: { playerName: string }) => void;
   'rejoin-room': (data: { roomCode: string; playerName: string }) => void;
+  'emoji-reaction': (data: { emoji: string }) => void;
 }
 
 // ── Stats Types ─────────────────────────────────────────────
