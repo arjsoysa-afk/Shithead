@@ -9,7 +9,7 @@ import { PlayerAvatar } from './Avatar';
 import { EmojiReaction } from './EmojiReaction';
 import { ParticleBurst } from './ParticleBurst';
 import { socket } from '../socket';
-import { playCardSound, playBurnSound, playPickupSound, playSpecialSound, toggleMute, muted } from '../hooks/useSound';
+import { playCardSound, playBurnSound, playPickupSound, playSpecialSound, playQueenSound, toggleMute, muted } from '../hooks/useSound';
 import type { ClientGameState, Card as CardType, PlayerStats } from '../../../shared/types';
 import type { FloatingEmoji } from './EmojiReaction';
 
@@ -85,8 +85,12 @@ export function GameBoard({
       setSessionStats({ burns: sessionBurns.current, pickups: sessionPickups.current });
     };
 
-    const onSpecialEffect = () => {
-      playSpecialSound();
+    const onSpecialEffect = ({ effect }: { effect: string }) => {
+      if (effect === 'FOOF') {
+        playQueenSound();
+      } else {
+        playSpecialSound();
+      }
     };
 
     socket.on('pile-burned', onPileBurned);

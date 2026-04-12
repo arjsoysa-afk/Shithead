@@ -154,7 +154,65 @@ export function playPickupSound(): void {
   }
 }
 
-/** Electronic zap for special cards (Queen / 10 / red 6). */
+/** Deep cat meow — played when a Queen (FOOF) is laid. */
+export function playQueenSound(): void {
+  try {
+    const ac = getCtx();
+    if (!ac) return;
+    if (getMuted()) return;
+
+    const t = ac.currentTime;
+
+    // ── Main meow tone (sine, deep cat frequency) ──
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'sine';
+    // Frequency glide: low → mid → low (mouth opening then closing)
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.linearRampToValueAtTime(420, t + 0.25);
+    osc.frequency.linearRampToValueAtTime(260, t + 0.65);
+    // Amplitude: quick attack, hold, then fade
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.4, t + 0.07);
+    gain.gain.setValueAtTime(0.38, t + 0.4);
+    gain.gain.linearRampToValueAtTime(0, t + 0.75);
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.start(t);
+    osc.stop(t + 0.75);
+
+    // ── Second harmonic (warmth) ──
+    const osc2 = ac.createOscillator();
+    const gain2 = ac.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(360, t);
+    osc2.frequency.linearRampToValueAtTime(840, t + 0.25);
+    osc2.frequency.linearRampToValueAtTime(520, t + 0.65);
+    gain2.gain.setValueAtTime(0, t);
+    gain2.gain.linearRampToValueAtTime(0.12, t + 0.07);
+    gain2.gain.setValueAtTime(0.1, t + 0.4);
+    gain2.gain.linearRampToValueAtTime(0, t + 0.75);
+    osc2.connect(gain2);
+    gain2.connect(ac.destination);
+    osc2.start(t);
+    osc2.stop(t + 0.75);
+
+    // ── Vibrato LFO (natural cat wobble) ──
+    const lfo = ac.createOscillator();
+    const lfoGain = ac.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(6, t); // 6Hz wobble
+    lfoGain.gain.setValueAtTime(8, t + 0.15); // starts after initial glide
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    lfo.start(t);
+    lfo.stop(t + 0.75);
+  } catch {
+    // fail silently
+  }
+}
+
+/** Electronic zap for special cards (10 / red 6). */
 export function playSpecialSound(): void {
   try {
     const ac = getCtx();
