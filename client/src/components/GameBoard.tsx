@@ -56,7 +56,7 @@ export function GameBoard({
           .filter(e => e.record);
 
         return (
-          <div className="absolute top-4 right-4 z-30 flex flex-col items-end gap-1.5"
+          <div className="fixed top-4 right-4 z-30 flex flex-col items-end gap-1.5"
             style={{
               background: 'rgba(10,10,24,0.6)',
               backdropFilter: 'blur(8px)',
@@ -103,14 +103,14 @@ export function GameBoard({
           const oppFinished = gameState.finishedPlayerIds.includes(opp.id);
           return (
             <div key={opp.id} className={`flex items-center gap-3 ${!opp.connected ? 'opacity-50' : ''} ${oppFinished ? 'opacity-40' : ''}`}>
-              <PlayerAvatar index={oppAvatarIdx} size={48} />
+              <PlayerAvatar index={oppAvatarIdx} size={36} />
               <div className="flex items-center gap-1.5">
-                <div className={`w-3 h-3 rounded-full ${
+                <div className={`w-2.5 h-2.5 rounded-full ${
                   !opp.connected ? 'bg-danger' :
                   isOppTurn ? 'bg-accent animate-pulse' :
                   'bg-success'
                 }`} />
-                <span className="text-4xl" style={{
+                <span className="text-2xl sm:text-4xl" style={{
                   fontFamily: "'CyberSlash', sans-serif",
                   color: oppColor,
                   textShadow: `0 0 14px ${oppColor}60`,
@@ -127,12 +127,12 @@ export function GameBoard({
         const myColor = CYBER_COLORS[myAvatarIndex % CYBER_COLORS.length];
         return (
           <div className={`fixed bottom-4 left-4 z-30 flex items-center gap-3 ${isFinished ? 'opacity-40' : ''}`}>
-            <PlayerAvatar index={myAvatarIndex} size={48} />
+            <PlayerAvatar index={myAvatarIndex} size={36} />
             <div className="flex items-center gap-1.5">
-              <div className={`w-3 h-3 rounded-full ${
+              <div className={`w-2.5 h-2.5 rounded-full ${
                 isYourTurn ? 'bg-accent animate-pulse' : 'bg-success'
               }`} />
-              <span className="text-4xl" style={{
+              <span className="text-2xl sm:text-4xl" style={{
                 fontFamily: "'CyberSlash', sans-serif",
                 color: myColor,
                 textShadow: `0 0 14px ${myColor}60`,
