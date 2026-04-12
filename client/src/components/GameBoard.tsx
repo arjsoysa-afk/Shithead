@@ -172,14 +172,14 @@ export function GameBoard({
       ))}
 
       {/* Center area: draw pile + discard pile — always visible */}
-      <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2
+      <div className="absolute top-[30%] left-1/2 -translate-x-1/2 -translate-y-1/2
         flex items-center gap-8 z-10">
         <DrawPile count={drawPileCount} />
         <Pile topCards={pileTop} count={pileCount} effectiveCard={gameState.effectiveCard} />
       </div>
 
-      {/* Status notification — fixed bottom right */}
-      <div className="absolute bottom-4 right-4 z-30">
+      {/* Status notification — fixed bottom right, above player panel */}
+      <div className="fixed bottom-4 right-4 z-30">
         {isYourTurn && !isFinished ? (
           <motion.div
             className="px-5 py-2 rounded-xl flex flex-col items-end gap-0.5"
@@ -240,7 +240,7 @@ export function GameBoard({
       </div>
 
       {/* Player area — fixed to bottom, cards scroll, buttons always pinned */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 flex flex-col" style={{ maxHeight: '50vh' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-20 flex flex-col" style={{ maxHeight: '42vh' }}>
 
         {/* Cards — scrollable area above the buttons */}
         <div className="flex-1 overflow-y-auto min-h-0 px-4 pt-2 flex flex-col items-center gap-1">
