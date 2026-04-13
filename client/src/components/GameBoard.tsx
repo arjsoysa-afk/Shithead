@@ -207,8 +207,8 @@ export function GameBoard({
         );
       })()}
 
-      {/* Opponent names — fixed top-left */}
-      <div className="fixed top-4 left-4 z-30 flex flex-col gap-4">
+      {/* Opponent names — fixed top-left, behind buttons */}
+      <div className="fixed top-4 left-4 z-10 flex flex-col gap-4 pointer-events-none">
         {opponents.map((opp, i) => {
           const oppAvatarIdx = avatarMap.get(opp.id) ?? i + 1;
           const oppColor = CYBER_COLORS[oppAvatarIdx % CYBER_COLORS.length];
@@ -238,7 +238,7 @@ export function GameBoard({
       {/* Mute toggle — bottom left, above player name */}
       <button
         onClick={handleMuteToggle}
-        className="fixed bottom-16 left-4 z-30 w-9 h-9 rounded-lg flex items-center justify-center
+        className="fixed bottom-16 left-4 z-25 w-9 h-9 rounded-lg flex items-center justify-center
           hover:scale-110 active:scale-95 transition-transform text-lg"
         style={{ background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
         aria-label={isMuted ? 'Unmute' : 'Mute'}
@@ -246,11 +246,11 @@ export function GameBoard({
         {isMuted ? '🔇' : '🔊'}
       </button>
 
-      {/* Your name — fixed bottom-left */}
+      {/* Your name — fixed bottom-left, behind buttons */}
       {(() => {
         const myColor = CYBER_COLORS[myAvatarIndex % CYBER_COLORS.length];
         return (
-          <div className={`fixed bottom-4 left-4 z-30 flex items-center gap-3 ${isFinished ? 'opacity-40' : ''}`}>
+          <div className={`fixed bottom-4 left-4 z-10 flex items-center gap-3 pointer-events-none ${isFinished ? 'opacity-40' : 'opacity-70'}`}>
             <PlayerAvatar index={myAvatarIndex} size={36} />
             <div className="flex items-center gap-1.5">
               <div className={`w-2.5 h-2.5 rounded-full ${
@@ -317,8 +317,8 @@ export function GameBoard({
         <Pile topCards={pileTop} count={pileCount} effectiveCard={gameState.effectiveCard} />
       </div>
 
-      {/* Status notification — fixed bottom right, above player panel */}
-      <div className="fixed bottom-4 right-4 z-30">
+      {/* Status notification — fixed bottom right, behind player panel buttons */}
+      <div className="fixed bottom-4 right-4 z-10 pointer-events-none">
         {isYourTurn && !isFinished ? (
           <motion.div
             className="px-5 py-2 rounded-xl flex flex-col items-end gap-0.5"
