@@ -145,30 +145,16 @@ export function playCards(
   let newState = deepClone(state);
   const newPlayer = newState.players[playerIndex];
 
-  // ── Face-down blind play ──────────────────────────────
-  if (source === 'faceDown') {
-    const cardIdx = newPlayer.faceDown.findIndex(c => c.id === cardIds[0]);
-    const card = newPlayer.faceDown.splice(cardIdx, 1)[0];
+  // ── Play a previously-revealed face-down card ────────
+  if (
+    newState.revealedFaceDown &&
+    newState.revealedFaceDown.playerId === playerId &&
+    cardIds.length === 1 &&
+    cardIds[0] === newState.revealedFaceDown.card.id
+  ) {
+    const card = newState.revealedFaceDown.card;
+    newState.revealedFaceDown = undefined;
 
-    // Check if the blind card can actually be played
-    const effectiveTop = getEffectivePileTop(newState.pile);
-    const playable = canPlayOn(card.rank, card.suit, effectiveTop, newState.mustPlayLower, newState.mustPickUp);
-
-    if (!playable) {
-      // Card goes on pile, then player picks up entire pile
-      newState.pile.push(card);
-      newPlayer.hand = [...newPlayer.hand, ...newState.pile];
-      newState.pile = [];
-      newState.mustPlayLower = false;
-      newState.mustPickUp = false;
-      sortHand(newPlayer.hand);
-      newState = advanceTurn(newState);
-      newState.lastAction = `${newPlayer.name} flipped ${formatCard(card)} — had to pick up!`;
-      return { state: newState, burned: false, pickedUpInstead: true, playedRanks: [card.rank] };
-    }
-
-    // Valid blind play — proceed normally
-    // Red 6s are always burnt, never go in the pile
     if (card.rank === '6' && isRedSuit(card.suit)) {
       newState.burnPile.push(card);
     } else {
@@ -176,18 +162,20 @@ export function playCards(
     }
     const result = applySpecialEffects(newState, [card]);
     newState = result.state;
+    if (card.rank !== '6') newState.mustPickUp = false;
 
     drawCards(newState, playerIndex);
     newState = checkPlayerFinished(newState, playerIndex);
+    if (!result.sameTurnAgain) newState = advanceTurn(newState, result.skipNext);
 
-    if (!result.sameTurnAgain) {
-      newState = advanceTurn(newState, result.skipNext);
-    }
-
-    newState.lastAction = `${newPlayer.name} flipped ${formatCard(card)}`;
+    newState.lastAction = `${newPlayer.name} played ${formatCard(card)} (from face-down)`;
     if (result.effect) newState.lastAction += ` — ${result.effect}`;
-
     return { state: checkGameOver(newState), effect: result.effect, burned: result.burned, playedRanks: [card.rank] };
+  }
+
+  // ── Face-down: reveal first, don't play immediately ──
+  if (source === 'faceDown') {
+    return { error: 'Click the face-down card to reveal it first, then choose to play or pick up' };
   }
 
   // ── Normal play (hand or face-up, or cross-source same rank) ─────────────────────
@@ -242,6 +230,33 @@ export function playCards(
   return { state: checkGameOver(newState), effect: result.effect, burned: result.burned, playedRanks: cards.map(c => c.rank) };
 }
 
+// ── Reveal Face-Down Card ───────────────────────────────────
+
+export function revealFaceDown(
+  state: GameState,
+  playerId: string,
+  cardId: string,
+): GameState | { error: string } {
+  if (state.phase !== 'playing') return { error: 'Game is not in playing phase' };
+  const playerIndex = state.players.findIndex(p => p.id === playerId);
+  if (playerIndex === -1) return { error: 'Player not found' };
+  if (state.currentPlayerIndex !== playerIndex) return { error: 'Not your turn' };
+
+  const player = state.players[playerIndex];
+  if (getCardSource(player) !== 'faceDown') return { error: 'You still have hand or face-up cards to play' };
+  if (state.revealedFaceDown) return { error: 'A card is already revealed' };
+
+  const newState = deepClone(state);
+  const newPlayer = newState.players[playerIndex];
+  const cardIdx = newPlayer.faceDown.findIndex(c => c.id === cardId);
+  if (cardIdx === -1) return { error: 'Card not found in face-down' };
+
+  const card = newPlayer.faceDown.splice(cardIdx, 1)[0];
+  newState.revealedFaceDown = { playerId, card };
+  newState.lastAction = `${newPlayer.name} revealed ${formatCard(card)} from face-down`;
+  return newState;
+}
+
 // ── Pick Up Pile ────────────────────────────────────────────
 
 export function pickUpPile(state: GameState, playerId: string): GameState | { error: string } {
@@ -250,12 +265,21 @@ export function pickUpPile(state: GameState, playerId: string): GameState | { er
   const playerIndex = state.players.findIndex(p => p.id === playerId);
   if (playerIndex === -1) return { error: 'Player not found' };
   if (state.currentPlayerIndex !== playerIndex) return { error: 'Not your turn' };
-  if (state.pile.length === 0) return { error: 'Pile is empty' };
+  // Allow pickup if pile is empty but player has a revealed face-down card to take back
+  if (state.pile.length === 0 && state.revealedFaceDown?.playerId !== playerId) {
+    return { error: 'Pile is empty' };
+  }
 
   let newState = deepClone(state);
   const player = newState.players[playerIndex];
 
   const wasForced = newState.mustPickUp; // red 6 forced pickup
+
+  // If a face-down card was revealed, it goes to hand along with the pile
+  if (newState.revealedFaceDown?.playerId === playerId) {
+    player.hand.push(newState.revealedFaceDown.card);
+    newState.revealedFaceDown = undefined;
+  }
 
   player.hand = [...player.hand, ...newState.pile];
   newState.pile = [];
@@ -413,6 +437,9 @@ export function getClientState(state: GameState, playerId: string): ClientGameSt
           faceUp: player.faceUp,
           faceDownCount: player.faceDown.length,
           faceDownIds: player.faceDown.map(c => c.id),
+          revealedFaceDown: state.revealedFaceDown?.playerId === playerId
+            ? state.revealedFaceDown.card
+            : undefined,
         }
       : { id: playerId, name: 'Unknown', hand: [], faceUp: [], faceDownCount: 0, faceDownIds: [] },
     opponents,

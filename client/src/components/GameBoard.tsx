@@ -22,6 +22,7 @@ interface GameBoardProps {
   onPlayCards: () => void;
   onPickUp: () => void;
   onPlayFaceDown: (cardId: string) => void;
+  onRevealFaceDown: (cardId: string) => void;
   loadStats: () => PlayerStats;
   onSendEmoji: (emoji: string) => void;
   emojiReactions: FloatingEmoji[];
@@ -35,6 +36,7 @@ export function GameBoard({
   onPlayCards,
   onPickUp,
   onPlayFaceDown,
+  onRevealFaceDown,
   loadStats,
   onSendEmoji,
   emojiReactions,
@@ -335,6 +337,10 @@ export function GameBoard({
                 <>Pick up or deflect</>
               ) : mustPlayLower ? (
                 <>Play lower than 7</>
+              ) : you.revealedFaceDown ? (
+                <>Play it or pick up</>
+              ) : (!hasHand && !hasFaceUp && hasFaceDown) ? (
+                <>Flip a face-down card</>
               ) : (
                 <>Your turn</>
               )}
@@ -398,16 +404,41 @@ export function GameBoard({
             </motion.div>
           )}
 
+          {/* Revealed face-down card — shown large, waiting for play/pickup decision */}
+          {you.revealedFaceDown && (
+            <motion.div
+              className="flex flex-col items-center gap-1 py-1"
+              initial={{ scale: 0.5, rotateY: 180, opacity: 0 }}
+              animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+            >
+              <div className="text-[10px] uppercase tracking-widest mb-0.5"
+                style={{ color: 'rgba(0,240,255,0.5)', fontFamily: "'CyberSlash', sans-serif" }}>
+                Revealed — play or pick up
+              </div>
+              <Card
+                card={you.revealedFaceDown}
+                onClick={() => onPlayFaceDown(you.revealedFaceDown!.id)}
+                selected={false}
+                index={0}
+              />
+            </motion.div>
+          )}
+
           {/* Table cards (face-down + face-up stacked) */}
           {(() => {
             const isPlayingFaceUp = !hasHand && hasFaceUp;
             const isPlayingFaceDown = !hasHand && !hasFaceUp && hasFaceDown;
+            // Don't show face-down slot for a card that's currently revealed
+            const revealedId = you.revealedFaceDown?.id;
 
             const handSelectedRank = selectedCardIds.size > 0
               ? you.hand.find(c => selectedCardIds.has(c.id))?.rank ?? null
               : null;
 
-            if (!hasFaceDown && !hasFaceUp) return null;
+            if (!hasFaceDown && !hasFaceUp && !you.revealedFaceDown) return null;
+            // If only the revealed card remains (all faceDown slots now empty), skip table row
+            if (you.faceDownCount === 0 && you.faceUp.length === 0) return null;
 
             return (
               <div className="flex justify-center items-center">
@@ -417,7 +448,8 @@ export function GameBoard({
                     const faceUpCard = you.faceUp[i];
                     const isCrossSourcePlay = hasHand && isYourTurn && faceUpCard != null && handSelectedRank === faceUpCard.rank;
                     const isFaceUpPlayable = (isPlayingFaceUp && faceUpCard) || isCrossSourcePlay;
-                    const isFaceDownPlayable = isPlayingFaceDown && hasFD;
+                    // Face-down clickable only when it's your turn, no hand/faceUp, and no card already revealed
+                    const isFaceDownPlayable = isPlayingFaceDown && hasFD && !revealedId && !you.revealedFaceDown;
 
                     return (
                       <div key={i} className="relative" style={{ width: 48, height: hasFD && faceUpCard ? 82 : 64 }}>
@@ -426,7 +458,7 @@ export function GameBoard({
                             <Card
                               small
                               index={i}
-                              onClick={isFaceDownPlayable && isYourTurn ? () => onPlayFaceDown(you.faceDownIds[i]) : undefined}
+                              onClick={isFaceDownPlayable && isYourTurn ? () => onRevealFaceDown(you.faceDownIds[i]) : undefined}
                             />
                           </div>
                         )}
@@ -470,14 +502,27 @@ export function GameBoard({
                 Play ({selectedCardIds.size})
               </motion.button>
             )}
-            {pileCount > 0 && (
+            {/* When a face-down card is revealed, show Play button for it */}
+            {you.revealedFaceDown && selectedCardIds.size === 0 && (
+              <motion.button
+                className="px-6 py-2.5 rounded-xl bg-accent text-white font-semibold text-sm
+                  hover:shadow-[0_4px_24px_rgba(108,92,231,0.3)] transition-all"
+                onClick={() => onPlayFaceDown(you.revealedFaceDown!.id)}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Play it
+              </motion.button>
+            )}
+            {(pileCount > 0 || you.revealedFaceDown) && (
               <button
                 className="px-6 py-2.5 rounded-xl bg-transparent border border-border
                   text-text-secondary text-sm font-medium hover:border-border-hover
                   hover:bg-white/[0.02] transition-all"
                 onClick={handlePickUp}
               >
-                Pick Up ({pileCount})
+                Pick Up {pileCount > 0 ? `(${pileCount})` : ''}
               </button>
             )}
           </div>

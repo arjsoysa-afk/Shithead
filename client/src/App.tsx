@@ -32,6 +32,7 @@ export default function App() {
     playSelectedCards,
     pickUpPile,
     playFaceDown,
+    revealFaceDown,
     playAgain,
     toggleCardSelection,
     selectAllSameRank,
@@ -134,6 +135,7 @@ export default function App() {
             onPlayCards={playSelectedCards}
             onPickUp={pickUpPile}
             onPlayFaceDown={playFaceDown}
+            onRevealFaceDown={revealFaceDown}
             loadStats={loadStats}
             onSendEmoji={sendEmojiReaction}
             emojiReactions={emojiReactions}

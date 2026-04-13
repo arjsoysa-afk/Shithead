@@ -64,6 +64,7 @@ export interface GameState {
   loserId: string | null;
   winnerId: string | null;     // first player to get rid of all cards
   finishedPlayerIds: string[]; // players who have emptied all cards (in order)
+  revealedFaceDown?: { playerId: string; card: Card }; // face-down card revealed before playing
 }
 
 export interface ClientGameState {
@@ -75,6 +76,7 @@ export interface ClientGameState {
     faceUp: Card[];
     faceDownCount: number;
     faceDownIds: string[];  // IDs only (no rank/suit) so player can click to play blind
+    revealedFaceDown?: Card; // card revealed from face-down, waiting for play/pickup decision
   };
   opponents: OpponentView[];
   pileTop: Card[];          // top 4 cards for display/validation context
@@ -132,6 +134,7 @@ export interface ClientToServerEvents {
   'play-vs-computer': (data: { playerName: string }) => void;
   'rejoin-room': (data: { roomCode: string; playerName: string }) => void;
   'emoji-reaction': (data: { emoji: string }) => void;
+  'reveal-face-down': (data: { cardId: string }) => void;
 }
 
 // ── Stats Types ─────────────────────────────────────────────

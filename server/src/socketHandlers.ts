@@ -6,7 +6,7 @@ import {
   createRoom, joinRoom, leaveRoom, rejoinRoom, findRoomByPlayer, Room,
 } from './roomManager';
 import {
-  createGame, swapCards, confirmReady, playCards, pickUpPile, getClientState,
+  createGame, swapCards, confirmReady, playCards, pickUpPile, revealFaceDown, getClientState,
 } from './gameEngine';
 import { chooseBotMove } from './botAI';
 
@@ -132,6 +132,20 @@ export function registerHandlers(io: TypedServer, socket: TypedSocket): void {
     if (room.gameState.phase === 'playing') {
       scheduleBotTurnIfNeeded(io, room);
     }
+  });
+
+  // ── Reveal Face-Down Card ───────────────────────────────
+  socket.on('reveal-face-down', ({ cardId }) => {
+    const room = findRoomByPlayer(socket.id);
+    if (!room?.gameState) return;
+
+    const result = revealFaceDown(room.gameState, socket.id, cardId);
+    if ('error' in result) {
+      socket.emit('invalid-move', { reason: result.error });
+      return;
+    }
+    room.gameState = result;
+    broadcastGameState(io, room);
   });
 
   // ── Play Cards ──────────────────────────────────────────

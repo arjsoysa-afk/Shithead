@@ -177,6 +177,10 @@ export function useGameState() {
     socket.emit('play-cards', { cardIds: [cardId] });
   }, []);
 
+  const revealFaceDown = useCallback((cardId: string) => {
+    socket.emit('reveal-face-down', { cardId });
+  }, []);
+
   const playAgain = useCallback(() => {
     socket.emit('play-again');
   }, []);
@@ -247,6 +251,7 @@ export function useGameState() {
     pickUpPile,
     playFaceDown,
     playAgain,
+    revealFaceDown,
     toggleCardSelection,
     selectAllSameRank,
     clearSelection,
