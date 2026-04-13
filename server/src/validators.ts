@@ -71,6 +71,16 @@ export function isValidPlay(
 
   const player = state.players[playerIndex];
 
+  // Allow playing a previously-revealed face-down card (it's no longer in any player array)
+  if (
+    state.revealedFaceDown &&
+    state.revealedFaceDown.playerId === playerId &&
+    cardIds.length === 1 &&
+    cardIds[0] === state.revealedFaceDown.card.id
+  ) {
+    return { valid: true };
+  }
+
   // Determine which card source the player should be using
   const source = getCardSource(player);
   if (!source) return { valid: false, reason: 'You have no cards to play' };

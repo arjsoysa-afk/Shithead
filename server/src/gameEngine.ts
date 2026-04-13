@@ -265,8 +265,13 @@ export function pickUpPile(state: GameState, playerId: string): GameState | { er
   const playerIndex = state.players.findIndex(p => p.id === playerId);
   if (playerIndex === -1) return { error: 'Player not found' };
   if (state.currentPlayerIndex !== playerIndex) return { error: 'Not your turn' };
-  // Allow pickup if pile is empty but player has a revealed face-down card to take back
-  if (state.pile.length === 0 && state.revealedFaceDown?.playerId !== playerId) {
+  // Allow pickup if:
+  // - pile has cards, OR
+  // - player has a revealed face-down card to take back, OR
+  // - mustPickUp is set (forced by red 6 — even if pile is empty, player still loses their attack)
+  if (state.pile.length === 0 &&
+      state.revealedFaceDown?.playerId !== playerId &&
+      !state.mustPickUp) {
     return { error: 'Pile is empty' };
   }
 

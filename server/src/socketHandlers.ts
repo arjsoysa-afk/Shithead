@@ -9,6 +9,7 @@ import {
   createGame, swapCards, confirmReady, playCards, pickUpPile, revealFaceDown, getClientState,
 } from './gameEngine';
 import { chooseBotMove } from './botAI';
+import { getCardSource, canPlayOn, getEffectivePileTop } from './validators';
 
 type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -285,38 +286,72 @@ function processBotTurn(io: TypedServer, room: Room): void {
 
   const botId = currentPlayer.id;
   const botName = currentPlayer.name;
+  const source = getCardSource(currentPlayer);
 
+  // ── Face-down: two-step reveal then play/pickup ──────────────────────────
+  if (source === 'faceDown') {
+    // Step 1: reveal a random face-down card and broadcast so players see it
+    const randomIdx = Math.floor(Math.random() * currentPlayer.faceDown.length);
+    const cardId = currentPlayer.faceDown[randomIdx].id;
+    const revealResult = revealFaceDown(room.gameState, botId, cardId);
+    if ('error' in revealResult) {
+      // Shouldn't happen — just bail
+      return;
+    }
+    room.gameState = revealResult;
+    broadcastGameState(io, room);
+
+    // Step 2: after a short delay, decide to play or pick up
+    setTimeout(() => {
+      if (!room.gameState || room.gameState.phase !== 'playing') return;
+      const revealed = room.gameState.revealedFaceDown;
+      if (!revealed || revealed.playerId !== botId) return;
+
+      const effectiveTop = getEffectivePileTop(room.gameState.pile);
+      const canPlay = canPlayOn(
+        revealed.card.rank,
+        revealed.card.suit,
+        effectiveTop,
+        room.gameState.mustPlayLower,
+        room.gameState.mustPickUp,
+      );
+
+      if (canPlay) {
+        const playResult = playCards(room.gameState, botId, [revealed.card.id]);
+        if (!('error' in playResult)) {
+          room.gameState = playResult.state;
+          emitPlayEffects(io, room, playResult, botId, botName);
+        } else {
+          // Unexpected — pick up as fallback
+          botPickUp(io, room, botId, botName);
+        }
+      } else {
+        botPickUp(io, room, botId, botName);
+      }
+
+      broadcastGameState(io, room);
+      checkGameOver(io, room);
+      if (room.gameState.phase === 'playing') {
+        scheduleBotTurnIfNeeded(io, room);
+      }
+    }, BOT_MOVE_DELAY);
+
+    return; // wait for the setTimeout above
+  }
+
+  // ── Hand / face-up: normal move ──────────────────────────────────────────
   const move = chooseBotMove(room.gameState, botId);
 
   if (move.action === 'play' && move.cardIds) {
     const result = playCards(room.gameState, botId, move.cardIds);
     if ('error' in result) {
-      // Fallback: if play fails, pick up
-      const pickupResult = pickUpPile(room.gameState, botId);
-      if (!('error' in pickupResult)) {
-        room.gameState = pickupResult;
-        io.to(room.code).emit('pile-picked-up', {
-          playerId: botId,
-          playerName: botName,
-          cardCount: currentPlayer.hand.length,
-        });
-      }
+      botPickUp(io, room, botId, botName);
     } else {
       room.gameState = result.state;
       emitPlayEffects(io, room, result, botId, botName);
     }
   } else {
-    // Pickup
-    const result = pickUpPile(room.gameState, botId);
-    if (!('error' in result)) {
-      room.gameState = result;
-      const botAfter = result.players.find(p => p.id === botId);
-      io.to(room.code).emit('pile-picked-up', {
-        playerId: botId,
-        playerName: botName,
-        cardCount: botAfter?.hand.length ?? 0,
-      });
-    }
+    botPickUp(io, room, botId, botName);
   }
 
   broadcastGameState(io, room);
@@ -325,6 +360,20 @@ function processBotTurn(io: TypedServer, room: Room): void {
   // Chain: if bot gets another turn (e.g. after burn/10), schedule again
   if (room.gameState.phase === 'playing') {
     scheduleBotTurnIfNeeded(io, room);
+  }
+}
+
+/** Pick up the pile (or just the revealed card) for a bot, emitting the event. */
+function botPickUp(io: TypedServer, room: Room, botId: string, botName: string): void {
+  const result = pickUpPile(room.gameState!, botId);
+  if (!('error' in result)) {
+    room.gameState = result;
+    const botAfter = result.players.find(p => p.id === botId);
+    io.to(room.code).emit('pile-picked-up', {
+      playerId: botId,
+      playerName: botName,
+      cardCount: botAfter?.hand.length ?? 0,
+    });
   }
 }
 

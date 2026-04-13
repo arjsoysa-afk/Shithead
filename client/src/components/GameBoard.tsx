@@ -10,6 +10,7 @@ import { EmojiReaction } from './EmojiReaction';
 import { ParticleBurst } from './ParticleBurst';
 import { socket } from '../socket';
 import { playCardSound, playBurnSound, playPickupSound, playSpecialSound, playQueenSound, toggleMute, muted } from '../hooks/useSound';
+import { startMusic, stopMusic, toggleMusicMute, musicMuted } from '../hooks/useMusic';
 import type { ClientGameState, Card as CardType, PlayerStats } from '../../../shared/types';
 import type { FloatingEmoji } from './EmojiReaction';
 
@@ -65,6 +66,13 @@ export function GameBoard({
 
   // Mute state
   const [isMuted, setIsMuted] = useState(muted);
+  const [isMusicMuted, setIsMusicMuted] = useState(musicMuted);
+
+  // Start music on mount, stop on unmount
+  useEffect(() => {
+    startMusic();
+    return () => stopMusic();
+  }, []);
 
   // Session stats
   const sessionBurns = useRef(0);
@@ -119,6 +127,11 @@ export function GameBoard({
   const handleMuteToggle = () => {
     const next = toggleMute();
     setIsMuted(next);
+  };
+
+  const handleMusicToggle = () => {
+    const next = toggleMusicMute();
+    setIsMusicMuted(next);
   };
 
   return (
@@ -235,16 +248,29 @@ export function GameBoard({
         })}
       </div>
 
-      {/* Mute toggle — bottom left, above player name */}
-      <button
-        onClick={handleMuteToggle}
-        className="fixed bottom-16 left-4 z-25 w-9 h-9 rounded-lg flex items-center justify-center
-          hover:scale-110 active:scale-95 transition-transform text-lg"
-        style={{ background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
-        aria-label={isMuted ? 'Unmute' : 'Mute'}
-      >
-        {isMuted ? '🔇' : '🔊'}
-      </button>
+      {/* Sound + music toggles — bottom left, above player name */}
+      <div className="fixed bottom-16 left-4 z-25 flex gap-2">
+        <button
+          onClick={handleMuteToggle}
+          className="w-9 h-9 rounded-lg flex items-center justify-center
+            hover:scale-110 active:scale-95 transition-transform text-lg"
+          style={{ background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+          aria-label={isMuted ? 'Unmute sounds' : 'Mute sounds'}
+          title={isMuted ? 'Unmute sounds' : 'Mute sounds'}
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </button>
+        <button
+          onClick={handleMusicToggle}
+          className="w-9 h-9 rounded-lg flex items-center justify-center
+            hover:scale-110 active:scale-95 transition-transform text-lg"
+          style={{ background: 'rgba(10,10,24,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}
+          aria-label={isMusicMuted ? 'Play music' : 'Mute music'}
+          title={isMusicMuted ? 'Play music' : 'Mute music'}
+        >
+          {isMusicMuted ? '🎵' : '🎶'}
+        </button>
+      </div>
 
       {/* Your name — fixed bottom-left, behind buttons */}
       {(() => {

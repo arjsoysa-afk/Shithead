@@ -74,7 +74,7 @@ export function GameOver({ gameState, stats, isHost, onPlayAgain, onLeave }: Gam
 
       {/* ── Main card ───────────────────────────────────────────────── */}
       <motion.div
-        className="w-full max-w-lg bg-bg-card border border-border rounded-3xl p-12 text-center
+        className="w-full max-w-lg bg-bg-card border border-border rounded-3xl p-6 sm:p-12 text-center
           relative overflow-hidden shadow-2xl"
         style={{ zIndex: 10 }}
         initial={{ scale: 0.8, opacity: 0 }}
@@ -146,7 +146,7 @@ export function GameOver({ gameState, stats, isHost, onPlayAgain, onLeave }: Gam
 
             {/* "SHITHEAD" pulsing */}
             <motion.div
-              className="text-5xl font-extrabold uppercase"
+              className="text-3xl sm:text-5xl font-extrabold uppercase"
               style={{
                 color: '#ff2222',
                 fontFamily: "'CyberSlash', sans-serif",

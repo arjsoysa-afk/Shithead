@@ -139,6 +139,9 @@ export function rejoinRoom(
     if (finIdx !== -1) room.gameState.finishedPlayerIds[finIdx] = newSocketId;
     if (room.gameState.winnerId === oldSocketId) room.gameState.winnerId = newSocketId;
     if (room.gameState.loserId === oldSocketId) room.gameState.loserId = newSocketId;
+    if (room.gameState.revealedFaceDown?.playerId === oldSocketId) {
+      room.gameState.revealedFaceDown.playerId = newSocketId;
+    }
   }
 
   room.lastActivity = Date.now();

@@ -25,7 +25,7 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
     return (
       <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
         <motion.div
-          className="w-full max-w-md rounded-2xl p-10 shadow-2xl relative overflow-hidden"
+          className="w-full max-w-md rounded-2xl p-5 sm:p-10 shadow-2xl relative overflow-hidden"
           style={{
             background: 'linear-gradient(160deg, rgba(20,20,35,0.95), rgba(12,12,26,0.98))',
             border: '1px solid rgba(191,90,242,0.15)',
@@ -40,7 +40,7 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
               style={{ color: 'rgba(191,90,242,0.4)', fontFamily: "'CyberSlash', sans-serif" }}>
               Room Code
             </div>
-            <div className="text-5xl font-extrabold tracking-[12px]"
+            <div className="text-3xl sm:text-5xl font-extrabold tracking-[6px] sm:tracking-[12px]"
               style={{
                 color: '#bf5af2',
                 textShadow: '0 0 20px rgba(191,90,242,0.5), 0 0 40px rgba(191,90,242,0.2)',
@@ -59,7 +59,7 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
                 className="flex items-center gap-3 py-3 last:border-0"
                 style={{ borderBottom: '1px solid rgba(191,90,242,0.08)' }}
               >
-                <PlayerAvatar index={i} size={72} />
+                <PlayerAvatar index={i} size={48} />
                 <span className="text-[15px]" style={{ fontFamily: "'CyberSlash', sans-serif" }}>{p.name}</span>
                 {p.id === roomInfo.hostId && (
                   <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide
@@ -157,9 +157,9 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
         animate={{ opacity: 1, y: 0 }}
       >
         {/* Cyberpunk Title */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-6 sm:mb-10">
           <motion.div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-[13px] mb-6 backdrop-blur-sm"
+            className="inline-flex items-center gap-2 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full border text-[11px] sm:text-[13px] mb-4 sm:mb-6 backdrop-blur-sm"
             style={{
               borderColor: 'rgba(191,90,242,0.2)',
               background: 'rgba(191,90,242,0.03)',
@@ -182,26 +182,28 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
           >
             {/* Glitch offset layers */}
             <h1
-              className="absolute inset-0 text-8xl text-center select-none"
+              className="absolute inset-0 text-center select-none"
               style={{
+                fontSize: 'clamp(2.5rem, 15vw, 6rem)',
                 color: 'transparent',
                 WebkitTextStroke: '1px rgba(191,90,242,0.2)',
                 transform: 'translate(3px, -2px)',
                 fontFamily: "'CyberSlash', sans-serif",
-                letterSpacing: '4px',
+                letterSpacing: 'clamp(1px, 1vw, 4px)',
               }}
               aria-hidden="true"
             >
               SHITHEAD
             </h1>
             <h1
-              className="absolute inset-0 text-8xl text-center select-none"
+              className="absolute inset-0 text-center select-none"
               style={{
+                fontSize: 'clamp(2.5rem, 15vw, 6rem)',
                 color: 'transparent',
                 WebkitTextStroke: '1px rgba(120,50,200,0.15)',
                 transform: 'translate(-3px, 2px)',
                 fontFamily: "'CyberSlash', sans-serif",
-                letterSpacing: '4px',
+                letterSpacing: 'clamp(1px, 1vw, 4px)',
               }}
               aria-hidden="true"
             >
@@ -209,8 +211,9 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
             </h1>
             {/* Main title */}
             <h1
-              className="relative text-8xl text-center"
+              className="relative text-center"
               style={{
+                fontSize: 'clamp(2.5rem, 15vw, 6rem)',
                 background: 'linear-gradient(180deg, #ffffff 20%, #e0b0ff 50%, #bf5af2 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -218,7 +221,7 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
                 paintOrder: 'stroke fill',
                 filter: 'drop-shadow(0 0 8px rgba(191,90,242,0.8)) drop-shadow(0 0 30px rgba(191,90,242,0.5)) drop-shadow(0 0 60px rgba(191,90,242,0.25))',
                 fontFamily: "'CyberSlash', sans-serif",
-                letterSpacing: '4px',
+                letterSpacing: 'clamp(1px, 1vw, 4px)',
               }}
             >
               SHIT<span style={{ position: 'relative', top: '10px', background: 'linear-gradient(180deg, #ffffff 20%, #e0b0ff 50%, #bf5af2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>H</span>EAD
@@ -236,7 +239,7 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
             />
             {/* Subtitle */}
             <motion.div
-              className="mt-3 text-[11px] uppercase tracking-[8px] text-center"
+              className="mt-3 text-[10px] sm:text-[11px] uppercase tracking-[4px] sm:tracking-[8px] text-center"
               style={{ color: 'rgba(191,90,242,0.35)', fontFamily: "'Inter', sans-serif" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -248,7 +251,7 @@ export function Lobby({ roomInfo, socketId, onCreateRoom, onJoinRoom, onPlayVsCo
         </div>
 
         <motion.div
-          className="rounded-2xl p-10 shadow-2xl relative overflow-hidden"
+          className="rounded-2xl p-5 sm:p-10 shadow-2xl relative overflow-hidden"
           style={{
             background: 'linear-gradient(160deg, rgba(20,20,35,0.95), rgba(12,12,26,0.98))',
             border: '1px solid rgba(191,90,242,0.1)',
